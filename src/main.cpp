@@ -10,6 +10,7 @@
 #include "lexer.h"
 
 extern void program();
+#define DEBUG
 
 
 int main() {

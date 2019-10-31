@@ -9,9 +9,9 @@ extern void constant_description();
 //<常量定义>
 extern void constant_definition();
 //<无符号整数>
-extern void unsigned_integer();
+extern int unsigned_integer();
 //<整数>
-extern void integer();
+extern int integer();
 //<声明头部>
 //void declaration_header();
 //<变量说明>

@@ -64,6 +64,7 @@ void check_wrapper(int token, int line)
 //<字符串>
 void parse_string()
 {
+    sym_table.addString(tokenVal);
     check(STRCON);
     //puts("<字符串>\n");
 }
@@ -94,7 +95,7 @@ void program() {
             }
         }
     }
-
+    sym_table.dump();
     //puts("<程序>");
 }
 //<常量说明>
@@ -112,19 +113,23 @@ void constant_description() {
 }
 //<常量定义>
 void constant_definition() {
+    string name;
     if (tokenType == INTTK) {
         while (tokenType == INTTK) {
             check(INTTK);
-            sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_INT, tokenVal);
+            name = tokenVal;
             check(IDENFR);
             check(ASSIGN);
             //integer();
+            int sign = 1;
             if (tokenType == PLUS)
             {
                 check(PLUS);
+                sign = 1;
             }
             else if (tokenType == MINU) {
                 check(MINU);
+                sign = -1;
             }
             if (tokenType != INTCON) {
                 handleError(ERROR_TYPE::CONSTANT_DEFINITION_ERROR, linenumber);
@@ -133,21 +138,25 @@ void constant_definition() {
                 }
             }
             else {
+                sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_INT, name, sign * atoi(tokenVal.c_str()));
                 skip();
             }
 
             while (tokenType == COMMA) {
                 check(COMMA);
-                sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_INT, tokenVal);
+                name = tokenVal;
                 check(IDENFR);
                 check(ASSIGN);
                 //integer();
+                sign = 1;
                 if (tokenType == PLUS)
                 {
                     check(PLUS);
+                    sign = 1;
                 }
                 else if (tokenType == MINU) {
                     check(MINU);
+                    sign = -1;
                 }
                 if (tokenType != INTCON) {
                     handleError(ERROR_TYPE::CONSTANT_DEFINITION_ERROR, linenumber);
@@ -156,6 +165,7 @@ void constant_definition() {
                     }
                 }
                 else {
+                    sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_INT, name, sign * atoi(tokenVal.c_str()));
                     skip();
                 }
             }
@@ -164,8 +174,7 @@ void constant_definition() {
     else if (tokenType == CHARTK) {
         while (tokenType == CHARTK) {
             check(CHARTK);
-            sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_CHAR, tokenVal);
-
+            name = tokenVal;
             check(IDENFR);
             check(ASSIGN);
 
@@ -176,13 +185,13 @@ void constant_definition() {
                 }
             }
             else {
+                sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_CHAR, name, (int)tokenVal[0]);
                 skip();
             }
 
             while (tokenType == COMMA) {
                 skip();
-                sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_INT, tokenVal);
-
+                name = tokenVal;
                 check(IDENFR);
                 check(ASSIGN);
                 if (tokenType != CHARCON) {
@@ -192,6 +201,7 @@ void constant_definition() {
                     }
                 }
                 else {
+                    sym_table.addLocal(context.curFunc, Symbol::SYM_CONST, Symbol::SYM_CHAR, name, (int)tokenVal[0]);
                     skip();
                 }
             }
@@ -207,21 +217,26 @@ void constant_definition() {
     //puts("<常量定义>");
 }
 //<无符号整数>
-void unsigned_integer() {
+int unsigned_integer() {
+    string val = tokenVal;
     check(INTCON);
     //puts("<无符号整数>");
+    return atoi(val.c_str());
 }
 //<整数>
-void integer() {
+int integer() {
+    int sign = 1;
     if (tokenType == PLUS)
     {
         check(PLUS);
+        sign = 1;
     }
     else if (tokenType == MINU) {
         check(MINU);
+        sign = -1;
     }
-    unsigned_integer();
     //puts("<整数>");
+    return sign * unsigned_integer();
 }
 
 //<变量说明>
@@ -259,9 +274,11 @@ void variable_description() {
 void variable_definition() {
     int kind;
     int type;
+    int size;
     string name;
     if (tokenType == INTTK || tokenType == CHARTK) {
         kind = Symbol::SYM_VAR;
+        size = 0;
         if (tokenType == INTTK) {
             type = Symbol::SYM_INT;
         }
@@ -278,23 +295,32 @@ void variable_definition() {
         if (tokenType == LBRACK) {
             kind = Symbol::SYM_ARRAY;
             check(LBRACK);
-            unsigned_integer();
+            size = unsigned_integer();
             check(RBRACK);
         }
         sym_table.addLocal(context.curFunc, kind, type, name);
+        Symbol* s = sym_table.getByName(context.curFunc, name);
+        if (s != nullptr && s->clazz == Symbol::SYM_ARRAY) {
+            s->size = size;
+        }
 
         while (tokenType == COMMA) {
             check(COMMA);
             kind = Symbol::SYM_VAR;
+            size = 0;
             name = tokenVal;
             check(IDENFR);
             if (tokenType == LBRACK) {
                 kind = Symbol::SYM_ARRAY;
                 check(LBRACK);
-                unsigned_integer();
+                size = unsigned_integer();
                 check(RBRACK);
             }
             sym_table.addLocal(context.curFunc, kind, type, name);
+            Symbol* s = sym_table.getByName(context.curFunc, name);
+            if (s != nullptr && s->clazz == Symbol::SYM_ARRAY) {
+                s->size = size;
+            }
         }
     }
     else {
