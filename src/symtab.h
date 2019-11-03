@@ -22,7 +22,8 @@ struct Symbol {
     string name;
     int size;
     int value;
-    void* addr;
+    unsigned int addr;
+    bool global;
     Symbol();
     Symbol(int clazz, int type, const string& name);
 };

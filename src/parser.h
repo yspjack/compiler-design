@@ -1,7 +1,13 @@
 #ifndef PARSER_H
 #define PARSER_H
+#include "symtab.h"
+#include "IR.h"
+#include <vector>
+#include <string>
+using std::string;
+using std::vector;
 //<字符串>
-extern void parse_string();
+extern void parse_string(string& tmp);
 //<程序>
 extern void program();
 //<常量说明>
@@ -29,11 +35,11 @@ extern void parameter_table();
 //<主函数>
 extern void main_function();
 //<表达式>
-extern void expression(int& type);
+extern void expression(int& type,string&tmp);
 //<项>
-extern void item(int& type);
+extern void item(int& type,string&tmp);
 //<因子>
-extern void factor(int& type);
+extern void factor(int& type,string&tmp);
 //<语句>
 extern void statement();
 //<赋值语句>
@@ -45,7 +51,7 @@ extern void condition();
 //<循环语句>
 extern void loop_statement();
 //<步长>
-extern void step_size();
+extern int step_size();
 //<有返回值函数调用语句>
 extern void with_return_value_function_call_statements(int& type);
 //<无返回值函数调用语句>
@@ -60,4 +66,12 @@ extern void read_statement();
 extern void write_statement();
 //<返回语句>
 extern void return_statement();
+
+extern SymTable sym_table;
+extern std::vector<IRCode> ircodes;
+struct ParseState {
+    string curFunc;
+    bool foundReturn;
+};
+extern ParseState context;
 #endif

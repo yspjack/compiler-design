@@ -19,6 +19,8 @@ Symbol::Symbol(int clazz, int type, const string& name) : clazz(clazz), type(typ
             size = sizeof(char);
         }
     }
+    addr = 0;
+    value = 0;
 }
 
 // Add global symbol
@@ -32,6 +34,7 @@ void SymTable::addGlobal(int clazz, int type, const string& name, int value) {
     }
     Symbol s = Symbol(clazz, type, name);
     s.value = value;
+    s.global = true;
     globalSymbols[name] = s;
     if (clazz == Symbol::SYM_FUNC) {
         functionLocalSymbols[name] = std::map<string, Symbol>();
@@ -57,6 +60,7 @@ void SymTable::addLocal(const string& func, int clazz, int type, const string& n
         }
         Symbol s = Symbol(clazz, type, name);
         s.value = value;
+        s.global = false;
         functionLocalSymbols[func][name] = s;
         if (clazz == Symbol::SYM_PARAM) {
             functionParams[func].push_back(s);
@@ -90,6 +94,9 @@ vector<Symbol>& SymTable::getParams(const string& func) {
 }
 
 void SymTable::addString(const string& value) {
+    if (stringId.count(value)) {
+        return;
+    }
     stringPool.push_back(value);
     stringId[value] = stringPool.size() - 1;
 }
@@ -117,6 +124,7 @@ void dumpSymbol(const Symbol& s) {
     else if (s.clazz == Symbol::SYM_ARRAY) {
         printf(" size=%d", s.size);
     }
+    printf(" addr=%x", s.addr);
     printf("\n");
 }
 void SymTable::dump() {

@@ -8,13 +8,12 @@
 #include <map>
 #include <vector>
 #include "lexer.h"
+#include "parser.h"
 
-extern void program();
 #define DEBUG
 
-
 int main() {
-    FILE* fin;
+    FILE *fin;
     fin = fopen("testfile.txt", "rb");
 #ifndef DEBUG
     freopen("error.txt", "w", stdout);
@@ -26,7 +25,7 @@ int main() {
     n = ftell(fin);
     rewind(fin);
 
-    char* buf = (char*)malloc(n + 1);
+    char *buf = (char *)malloc(n + 1);
     fread(buf, sizeof(char), n, fin);
     fclose(fin);
     buf[n] = '\0';
@@ -35,6 +34,12 @@ int main() {
     nextToken();
 
     program();
+    // void genData();
+    // genData();
+    sym_table.dump();
+    for (auto &i : ircodes) {
+        i.dump();
+    }
     free(buf);
     return 0;
 }

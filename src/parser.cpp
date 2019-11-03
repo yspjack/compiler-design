@@ -13,16 +13,14 @@
 #include "parser.h"
 #include "symtab.h"
 #include "errproc.h"
-
+#include "IR.h"
+using std::vector;
+using std::string;
 
 SymTable sym_table;
 
-struct ParseState {
-    string curFunc;
-    bool foundReturn;
-};
-
 ParseState context;
+vector<IRCode> ircodes;
 
 void skip()
 {
@@ -61,10 +59,25 @@ void check_wrapper(int token, int line)
     }
 }
 
+std::string genLabel()
+{
+    static int cnt = 0;
+    cnt++;
+    return ".LC" + std::to_string(cnt);
+}
+
+std::string genTmp()
+{
+    static int cnt = 0;
+    cnt++;
+    return "$t" + std::to_string(cnt);
+}
+
 //<字符串>
-void parse_string()
+void parse_string(string& tmp)
 {
     sym_table.addString(tokenVal);
+    tmp = ".string_" + std::to_string(sym_table.stringId[tokenVal]);
     check(STRCON);
     //puts("<字符串>\n");
 }
@@ -95,7 +108,6 @@ void program() {
             }
         }
     }
-    sym_table.dump();
     //puts("<程序>");
 }
 //<常量说明>
@@ -464,20 +476,31 @@ int convType(int typeA, int typeB) {
 }
 
 //<表达式>
-void expression(int& type) {
+void expression(int& type,string&tmp) {
     int typeB;
+    string tmpA,tmpB;
+    bool neg=false;
     if (tokenType == PLUS) {
-        check(PLUS);
+        check(PLUS);neg=false;
     }
     else if (tokenType == MINU) {
-        check(MINU);
+        check(MINU);neg=true;
     }
-    item(type);
+    item(type, tmpA);
+    if (neg) {
+        ircodes.push_back(IRCode(IROperator::NEG, tmpA, "", ""));
+    }
+    tmp=tmpA;
     if (tokenType == PLUS || tokenType == MINU) {
         while (tokenType == PLUS || tokenType == MINU) {
+            int opType=tokenType;
             skip();
-            item(typeB);
+            item(typeB, tmpB);
             type = convType(type, typeB);
+            IROperator op=(opType == PLUS) ? IROperator::ADD:IROperator::SUB;
+            tmp=genTmp();
+            ircodes.push_back(IRCode(op, tmpA, tmpB, tmp));
+            tmpA=tmp;
         }
     }
     else {
@@ -486,54 +509,73 @@ void expression(int& type) {
     //puts("<表达式>");
 }
 //<项>
-void item(int& type) {
+void item(int& type,string&tmp) {
     int typeB;
+    string tA,tB;
+    
 
-    factor(type);
+    factor(type,tA);
+    tmp=tA;
     if (tokenType == MULT || tokenType == DIV) {
         while (tokenType == MULT || tokenType == DIV) {
+            int opType=tokenType;
             skip();
-            factor(typeB);
+            factor(typeB,tB);
             type = convType(type, typeB);
-
+            IROperator op=(opType == MULT) ? IROperator::MUL:IROperator::DIV;
+            tmp=genTmp();
+            ircodes.push_back(IRCode(op,tA,tB,tmp));
+            tA=tmp;
         }
     }
     //puts("<项>");
 }
 //<因子>
-void factor(int& type) {
+void factor(int& type,string&tmp) {
+    string tA,tB;
     if (tokenType == IDENFR) {
         int look = lookAhead(1);
         if (look == LBRACK) {
+            tA=tokenVal;
             check(IDENFR);
             check(LBRACK);
-            expression(type);
+            expression(type,tB);
             if (type != Symbol::SYM_INT) {
                 handleError(SUBSCRIPT_CAN_ONLY_BE_INTEGER_EXPRESSION, linenumber);
             }
             check(RBRACK);
+            tmp=genTmp();
+            ircodes.push_back(IRCode(IROperator::LOADARR,tA,tB,tmp));
         }
         else if (look == LPARENT) {
             with_return_value_function_call_statements(type);
+            tmp="$RET";
+            ircodes.push_back(IRCode(IROperator::MOV,tA,tB,tmp));
         }
         else {
             Symbol* s = sym_table.getByName(context.curFunc, tokenVal);
             type = s->type;
+            tmp=tokenVal;
             check(IDENFR);
         }
     }
     else if (tokenType == LPARENT) {
         check(LPARENT);
-        expression(type);
+        expression(type,tmp);
         check(RPARENT);
     }
     else if (tokenType == CHARCON) {
+        int val = static_cast<int>(tokenVal[0]);
         check(CHARCON);
         type = Symbol::SYM_CHAR;
+        tmp = genTmp();
+        ircodes.push_back(IRCode(IROperator::LI, std::to_string(val), "", tmp));
     }
     else {
-        integer();
+        int val = integer();
         type = Symbol::SYM_INT;
+        tmp = genTmp();
+        ircodes.push_back(IRCode(IROperator::LI, std::to_string(val), "", tmp));
     }
     //puts("<因子>");
 }
@@ -619,20 +661,29 @@ void checkAssign(const string& name)
 //<赋值语句>
 void assignment_statement() {
     int type;
+    string tA, tB, tmp;
+    bool isArr=false;
     checkAssign(tokenVal);
 
+    tA = tokenVal;
     check(IDENFR);
     if (tokenType == LBRACK) {
         check(LBRACK);
-        expression(type);
+        expression(type, tB);
         if (type != Symbol::SYM_INT) {
             handleError(SUBSCRIPT_CAN_ONLY_BE_INTEGER_EXPRESSION, linenumber);
         }
         check(RBRACK);
+        isArr=true;
     }
     check(ASSIGN);
-    expression(type);
-    //puts("<赋值语句>");
+    expression(type, tmp);
+    if(isArr){
+        ircodes.push_back(IRCode(IROperator::SAVEARR, tA, tB, tmp));
+    }else{
+        ircodes.push_back(IRCode(IROperator::MOV, tmp, "", tA));
+    }
+    // puts("<赋值语句>");
 }
 //<条件语句>
 void conditional_statement() {
@@ -662,22 +713,46 @@ bool isRelation(int t) {
     }
     return false;
 }
+IROperator getRelationOp(int t)
+{
+    switch (t) {
+    case LSS:
+        return IROperator::LT;
+    case LEQ:
+        return IROperator::LEQ;
+    case GRE:
+        return IROperator::GT;
+    case GEQ:
+        return IROperator::NEQ;
+    case EQL:
+        return IROperator::EQU;
+    case NEQ:
+        return IROperator::NEQ;
+    default:
+        assert(0);
+    }
+}
 //<条件>
 void condition() {
+    IROperator op;
     int typeA, typeB;
-    expression(typeA);
+    string tmpA, tmpB, dst="$FLAG";
+    expression(typeA, tmpA);
     if (isRelation(tokenType)) {
+        op = getRelationOp(tokenType);
         skip();
-        expression(typeB);
+        expression(typeB, tmpB);
         if (typeA != typeB) {
             handleError(ILLEGAL_TYPE_IN_CONDITION, linenumber);
         }
+        ircodes.push_back(IRCode(op, tmpA, tmpB, dst));
     }
-    //puts("<条件>");
+    // puts("<条件>");
 }
 //<循环语句>
 void loop_statement() {
     int type;
+    string tmp;
     if (tokenType == WHILETK) {
         check(WHILETK);
         check(LPARENT);
@@ -691,7 +766,7 @@ void loop_statement() {
         checkAssign(tokenVal);
         check(IDENFR);
         check(ASSIGN);
-        expression(type);
+        expression(type, tmp);
         check(SEMICN);
         condition();
         check(SEMICN);
@@ -725,8 +800,8 @@ void loop_statement() {
     //puts("<循环语句>");
 }
 //<步长>
-void step_size() {
-    unsigned_integer();
+int step_size() {
+    return unsigned_integer();
     //puts("<步长>");
 }
 //<有返回值函数调用语句>
@@ -736,6 +811,7 @@ void with_return_value_function_call_statements(int& type) {
     type = s->type;
     check(IDENFR);
     check(LPARENT);
+    ircodes.push_back(IRCode(IROperator::CALL,func,"",""));
     value_parameter_table(func);
     check(RPARENT);
     //puts("<有返回值函数调用语句>");
@@ -745,6 +821,7 @@ void no_return_value_function_call_statement() {
     string func = tokenVal;
     check(IDENFR);
     check(LPARENT);
+    ircodes.push_back(IRCode(IROperator::CALL,func,"",""));
     value_parameter_table(func);
     check(RPARENT);
     //puts("<无返回值函数调用语句>");
@@ -754,10 +831,22 @@ void value_parameter_table(const string& func) {
     int paramCount = 0;
     bool paramCountError = false;
     int type;
+    string tmp;
+    auto getType = [](int t) {
+        switch (t) {
+        case Symbol::SYM_INT:
+            return "INT";
+        case Symbol::SYM_CHAR:
+            return "CHAR";
+        default:
+            return "";
+        }
+        return "";
+    };
 
     std::vector<Symbol>& params = sym_table.getParams(func);
     if (tokenType != RPARENT) {
-        expression(type);
+        expression(type,tmp);
         if (paramCount >= params.size()) {
             paramCountError = true;
         }
@@ -767,12 +856,11 @@ void value_parameter_table(const string& func) {
             }
         }
         paramCount++;
-
-
+        ircodes.push_back(IRCode(IROperator::PUSH, tmp, getType(type), ""));
 
         while (tokenType == COMMA) {
             skip();
-            expression(type);
+            expression(type,tmp);
 
             if (paramCount >= params.size()) {
                 paramCountError = true;
@@ -783,6 +871,7 @@ void value_parameter_table(const string& func) {
                 }
             }
             paramCount++;
+            ircodes.push_back(IRCode(IROperator::PUSH, tmp, getType(type), ""));
         }
     }
     if (paramCount != params.size()) {
@@ -818,18 +907,35 @@ void read_statement() {
 //<写语句>
 void write_statement() {
     int type;
+    string tmp;
     check(PRINTFTK);
     check(LPARENT);
+    auto getType = [](int t) {
+        switch (t) {
+        case Symbol::SYM_INT:
+            return "INT";
+        case Symbol::SYM_CHAR:
+            return "CHAR";
+        default:
+            return "";
+        }
+        return "";
+    };
 
     if (tokenType == STRCON) {
-        parse_string();
+        parse_string(tmp);
+        ircodes.push_back(IRCode(IROperator::WRITE,tmp,"STR",""));
         if (tokenType == COMMA) {
             skip();
-            expression(type);
+            expression(type,tmp);
+            ircodes.push_back(IRCode(IROperator::WRITE,tmp,getType(type),""));
         }
     }
     else {
-        expression(type);
+        expression(type,tmp);
+        IROperator op = (type == Symbol::SYM_INT) ? (IROperator::WRITE)
+                                                  : (IROperator::WRITE);
+        ircodes.push_back(IRCode(op,tmp,getType(type),""));
     }
     check(RPARENT);
     //puts("<写语句>");
@@ -837,13 +943,14 @@ void write_statement() {
 //<返回语句>
 void return_statement() {
     int type;
+    string tmo;
     Symbol* p = sym_table.getByName("", context.curFunc);
     context.foundReturn = true;
 
     check(RETURNTK);
     if (tokenType == LPARENT) {
         check(LPARENT);
-        expression(type);
+        expression(type,tmo);
         check(RPARENT);
         if (p->type == Symbol::SYM_VOID) {
             handleError(MISMATCHED_RETURN_STATEMENT_FOR_VOID, linenumber);
