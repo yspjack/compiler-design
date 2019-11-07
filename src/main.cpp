@@ -10,7 +10,7 @@
 #include "lexer.h"
 #include "parser.h"
 
-#define DEBUG
+// #define DEBUG
 
 int main() {
     FILE *fin;
@@ -34,12 +34,12 @@ int main() {
     nextToken();
 
     program();
-    // void genData();
-    // genData();
-    sym_table.dump();
+    // sym_table.dump();
     for (auto &i : ircodes) {
         i.dump();
     }
+    void objectCode(const std::vector<IRCode>& ircodes);
+    objectCode(ircodes);
     free(buf);
     return 0;
 }

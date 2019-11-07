@@ -47,7 +47,7 @@ extern void assignment_statement();
 //<条件语句>
 extern void conditional_statement();
 //<条件>
-extern void condition();
+extern void condition(string& tmp);
 //<循环语句>
 extern void loop_statement();
 //<步长>
@@ -73,5 +73,5 @@ struct ParseState {
     string curFunc;
     bool foundReturn;
 };
-extern ParseState context;
+// extern ParseState context;
 #endif

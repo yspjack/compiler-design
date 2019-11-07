@@ -5,7 +5,7 @@ enum class IROperator {
     SUB,
     MUL,
     DIV,
-    NEG,
+    // NEG,
     LOADARR,
     SAVEARR,
     FUNC,
@@ -27,14 +27,15 @@ enum class IROperator {
     LABEL,
     READ,
     WRITE,
-    MOV,
-    LI
+    MOV
+    // LI
 };
 
 struct IRCode {
     IROperator op;
     std::string op1, op2;
     std::string dst;
-    IRCode(IROperator op, std::string op1, std::string op2, std::string dst);
-    void dump();
+    IRCode(IROperator op, const std::string &op1, const std::string &op2, const std::string &dst);
+    void dump() const;
+    std::string dumpString() const;
 };

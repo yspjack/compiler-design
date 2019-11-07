@@ -80,7 +80,8 @@ Symbol* SymTable::getByName(const string& func, const string& name) {
             if (functionLocalSymbols[func].count(name)) {
                 return &functionLocalSymbols[func][name];
             }
-            else {
+            if (globalSymbols.count(name))
+            {
                 return &globalSymbols[name];
             }
         }
