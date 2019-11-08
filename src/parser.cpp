@@ -506,12 +506,13 @@ void main_function() {
 int convType(int typeA, int typeB) {
     assert(typeA == Symbol::SYM_CHAR || typeA == Symbol::SYM_INT);
     assert(typeB == Symbol::SYM_CHAR || typeB == Symbol::SYM_INT);
-    if (typeA == typeB) {
-        return typeA;
-    }
-    else {
-        return Symbol::SYM_INT;
-    }
+    // if (typeA == typeB) {
+    //     return typeA;
+    // }
+    // else {
+    //     return Symbol::SYM_INT;
+    // }
+    return Symbol::SYM_INT;
 }
 
 //<表达式>
@@ -530,6 +531,7 @@ void expression(int& type,string&tmp) {
         // ircodes.push_back(IRCode(IROperator::NEG, tmpA, "", ""));
         string tmpA = tmp;
         tmp = genTmp();
+        type = Symbol::SYM_INT;
         ircodes.push_back(IRCode(IROperator::SUB, std::to_string(0), tmpA, tmp));
     }
     if (tokenType == PLUS || tokenType == MINU) {
@@ -585,6 +587,8 @@ void factor(int& type,string&tmp) {
                 handleError(SUBSCRIPT_CAN_ONLY_BE_INTEGER_EXPRESSION, linenumber);
             }
             check(RBRACK);
+            Symbol *s = sym_table.getByName(context.curFunc, tA);
+            type = s->type;
             tmp=genTmp();
             ircodes.push_back(IRCode(IROperator::LOADARR,tA,tB,tmp));
         }
@@ -610,6 +614,7 @@ void factor(int& type,string&tmp) {
     else if (tokenType == LPARENT) {
         check(LPARENT);
         expression(type,tmp);
+        type = Symbol::SYM_INT;
         check(RPARENT);
     }
     else if (tokenType == CHARCON) {
