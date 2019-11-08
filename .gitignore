@@ -1,4 +1,8 @@
 .vs/
 out/
 test/
+.vscode/
+mips.txt
+error.txt
+testfile.txt
 
