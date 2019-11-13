@@ -9,7 +9,7 @@
 #include <vector>
 #include "lexer.h"
 #include "parser.h"
-
+#include "optimize.h"
 // #define DEBUG
 
 int main() {
@@ -35,9 +35,9 @@ int main() {
 
     program();
     // sym_table.dump();
-    for (auto &i : ircodes) {
-        i.dump();
-    }
+    // for (auto &i : ircodes) {
+    //     i.dump();
+    // }
     void objectCode(const std::vector<IRCode>& ircodes);
     objectCode(ircodes);
     free(buf);
