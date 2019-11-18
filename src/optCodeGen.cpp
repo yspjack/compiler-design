@@ -450,11 +450,10 @@ void genStore(const IRCode &ircode) {
             ss << "sll " << rs << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "addu " << rs << ", " << rs << ", "
-               << "(" << rs << ")";
+            ss << "addu " << rs << ", " << rs << ", " << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "sw " << rt << ", " << base->addr << rs;
+            ss << "sw " << rt << ", " << base->addr << "(" << rs << ")";
             writeAsm(ss.str());
         }
     }
