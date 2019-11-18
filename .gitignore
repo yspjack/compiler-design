@@ -5,4 +5,5 @@ test/
 mips.txt
 error.txt
 testfile.txt
-
+*.zip
+*.rar

@@ -16,7 +16,7 @@
 int main() {
     FILE *fin;
     fin = fopen("testfile.txt", "rb");
-    freopen("error.txt", "w", stdout);
+    //freopen("error.txt", "w", stdout);
 #ifndef DEBUG
 #endif
     assert(fin);

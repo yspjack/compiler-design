@@ -765,6 +765,6 @@ void objectCode(const std::vector<IRCode> &ircodes) {
         }
     }
     fclose(fout);
-    sym_table.dump();
+    //sym_table.dump();
 }
 #endif

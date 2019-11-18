@@ -339,11 +339,10 @@ void genStore(const IRCode& ircode)
             ss << "sll " << rs << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "addu " << rs << ", " << rs << ", "
-               << "(" << rs << ")";
+            ss << "addu " << rs << ", " << rs << ", " << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "sw " << rt << ", " << base->addr << rs;
+            ss << "sw " << rt << ", " << base->addr << "(" << rs << ")";
             writeAsm(ss.str());
         }
     }
@@ -535,7 +534,7 @@ void genData()
 
 void objectCode(const std::vector<IRCode>& ircodes)
 {
-    sym_table.dump();
+    //sym_table.dump();
     fout = fopen("mips.txt", "w");
     assert(fout);
     genData();
@@ -547,6 +546,6 @@ void objectCode(const std::vector<IRCode>& ircodes)
         IR2mips(code);
     }
     fclose(fout);
-    sym_table.dump();
+    //sym_table.dump();
 }
 #endif

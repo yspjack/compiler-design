@@ -1,3 +1,5 @@
+#include "config.h"
+#ifdef USE_OPTIMIZE
 #include <vector>
 #include <map>
 #include <string>
@@ -10,7 +12,6 @@
 #include <queue>
 #include "IR.h"
 #include "parser.h"
-#include "config.h"
 // using std::map;
 // using std::set;
 // using std::string;
@@ -837,3 +838,4 @@ void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
         code.dump();
     }
 }
+#endif
