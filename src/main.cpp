@@ -10,13 +10,14 @@
 #include "lexer.h"
 #include "parser.h"
 #include "optimize.h"
+#include "config.h"
 // #define DEBUG
 
 int main() {
     FILE *fin;
     fin = fopen("testfile.txt", "rb");
-#ifndef DEBUG
     freopen("error.txt", "w", stdout);
+#ifndef DEBUG
 #endif
     assert(fin);
     int n;
@@ -38,8 +39,14 @@ int main() {
     // for (auto &i : ircodes) {
     //     i.dump();
     // }
-    void objectCode(const std::vector<IRCode>& ircodes);
+    void objectCode(const std::vector<IRCode> &ircodes);
+#ifdef USE_OPTIMIZE
+    vector<IRCode> optCode;
+    optimizeIR(ircodes, optCode);
+    objectCode(optCode);
+#else
     objectCode(ircodes);
+#endif
     free(buf);
     return 0;
 }

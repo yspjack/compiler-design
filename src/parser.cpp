@@ -751,13 +751,17 @@ void conditional_statement() {
     labA = genLabel();
     ircodes.push_back(IRCode(IROperator::BZ, tmp, labA, ""));
     statement();
-    ircodes.push_back(IRCode(IROperator::LABEL, labA, "", ""));
     if (tokenType == ELSETK) {
-        check(ELSETK);
         labB = genLabel();
-        ircodes.push_back(IRCode(IROperator::BNZ, tmp, labB, ""));
+        ircodes.push_back(IRCode(IROperator::JUMP,  labB, "",""));
+        ircodes.push_back(IRCode(IROperator::LABEL, labA, "", ""));
+        check(ELSETK);
+        //ircodes.push_back(IRCode(IROperator::BNZ, tmp, labB, ""));
         statement();
         ircodes.push_back(IRCode(IROperator::LABEL, labB, "", ""));
+    }
+    else {
+        ircodes.push_back(IRCode(IROperator::LABEL, labA, "", ""));
     }
     //puts("<条件语句>");
 }

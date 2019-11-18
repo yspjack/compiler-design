@@ -1,3 +1,6 @@
+#include "config.h"
+// #if 1
+#if !defined(USE_OPTIMIZE)
 #include <vector>
 #include <map>
 #include <string>
@@ -346,14 +349,6 @@ void genStore(const IRCode& ircode)
     }
 }
 
-static vector<string> powerOf2 = {
-    "1",         "2",        "4",        "8",         "16",        "32",
-    "64",        "128",      "256",      "512",       "1024",      "2048",
-    "4096",      "8192",     "16384",    "32768",     "65536",     "131072",
-    "262144",    "524288",   "1048576",  "2097152",   "4194304",   "8388608",
-    "16777216",  "33554432", "67108864", "134217728", "268435456", "536870912",
-    "1073741824"};
-
 void genArithmetic(const IRCode& ircode)
 {
     stringstream ss;
@@ -368,33 +363,16 @@ void genArithmetic(const IRCode& ircode)
         ss << "subu " << rd << ", " << rs << ", " << rt;
         break;
     case IROperator::MUL:
-        if (find(powerOf2.begin(), powerOf2.end(), ircode.op1) != powerOf2.end()) {
-            int shift =
-                find(powerOf2.begin(), powerOf2.end(), ircode.op1) - powerOf2.begin();
-            ss << "sll " << rd << ", " << rt << ", " << shift;
-        } else if (find(powerOf2.begin(), powerOf2.end(), ircode.op2) !=
-                   powerOf2.end()) {
-            int shift =
-                find(powerOf2.begin(), powerOf2.end(), ircode.op2) - powerOf2.begin();
-            ss << "sll " << rd << ", " << rs << ", " << shift;
-        } else {
             ss << "mult " << rs << ", " << rt;
             writeAsm(ss.str());
             ss.str("");
             ss << "mflo " << rd;
-        }
         break;
     case IROperator::DIV:
-        if (find(powerOf2.begin(), powerOf2.end(), ircode.op2) != powerOf2.end()) {
-            int shift =
-                find(powerOf2.begin(), powerOf2.end(), ircode.op2) - powerOf2.begin();
-            ss << "srl " << rd << ", " << rs << ", " << shift;
-        } else {
             ss << "div " << rs << ", " << rt;
             writeAsm(ss.str());
             ss.str("");
             ss << "mflo " << rd;
-        }
         break;
     case IROperator::LEQ:
         ss << "sle " << rd << ", " << rs << ", " << rt;
@@ -571,3 +549,4 @@ void objectCode(const std::vector<IRCode>& ircodes)
     fclose(fout);
     sym_table.dump();
 }
+#endif
