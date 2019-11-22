@@ -678,6 +678,7 @@ void objectCode(const std::vector<IRCode> &ircodes) {
     scanTmp(ircodes);
     writeAsm(".text");
     writeAsm(".globl main");
+    writeAsm("j main");
 
     for (int i = 0; i < ircodes.size();i++) {
         const auto& ircode = ircodes[i];

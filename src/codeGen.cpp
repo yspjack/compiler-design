@@ -550,6 +550,7 @@ void objectCode(const std::vector<IRCode>& ircodes)
     scanTmp(ircodes);
     writeAsm(".text");
     writeAsm(".globl main");
+    writeAsm("j main");
 
     for (const auto &code : ircodes) {
         IR2mips(code);
