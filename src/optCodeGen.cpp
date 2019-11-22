@@ -483,6 +483,7 @@ void genArithmetic(const IRCode &ircode) {
     case IROperator::MUL:
         if (c1 && c2) {
             ss << "li " << rd << ", " << stoi(ircode.op1) * stoi(ircode.op2);
+            writeAsm(ss.str());
         } else if (find(powerOf2.begin(), powerOf2.end(), ircode.op1) !=
                    powerOf2.end()) {
             getReg(ircode.op2, rt);
@@ -510,6 +511,7 @@ void genArithmetic(const IRCode &ircode) {
     case IROperator::DIV:
         if (c1 && c2) {
             ss << "li " << rd << ", " << stoi(ircode.op1) / stoi(ircode.op2);
+            writeAsm(ss.str());
         } else if (find(powerOf2.begin(), powerOf2.end(), ircode.op2) !=
                    powerOf2.end()) {
             getReg(ircode.op1, rs);
