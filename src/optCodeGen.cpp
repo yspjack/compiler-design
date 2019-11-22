@@ -402,19 +402,21 @@ void genLoad(const IRCode &ircode) {
         }
     } else {
         if (base->type == Symbol::SYM_CHAR) {
-            ss << "addu " << rs << ", " << rs << ", " << base->addr;
+            ss << "addu " << rs << ", " << rs << ", "
+                << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "lbu " << rt << ", " << base->addr << "($sp)";
+            ss << "lbu " << rt << ", " << base->addr << "(" << rs << ")";
             writeAsm(ss.str());
-        } else {
+        }
+        else {
             ss << "sll " << rs << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "addu " << rs << ", " << rs << ", " << base->addr;
+            ss << "addu " << rs << ", " << rs << ", " << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "lw " << rt << ", " << base->addr << "($sp)";
+            ss << "lw " << rt << ", " << base->addr << "(" << rs << ")";
             writeAsm(ss.str());
         }
     }
