@@ -527,7 +527,16 @@ void genData()
     assert(size_cnt % 4 == 0);
     for (const auto& p : sym_table.stringId) {
         writeAsm(".string_" + std::to_string(p.second) + ":");
-        writeAsm(".asciiz \"" + p.first + "\"");
+        string tmp;
+        for (char c : p.first) {
+            if (c == '\\') {
+                tmp += "\\\\";
+            }
+            else {
+                tmp += c;
+            }
+        }
+        writeAsm(".asciiz \"" + tmp + "\"");
     }
     // writeAsm(".end: .word 0");
 }
