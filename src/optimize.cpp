@@ -553,11 +553,12 @@ void globalRegisterAllocate(FunctionBlock& local) {
     }
 
     local.ircodes = result;
-
+#ifdef DEBUG
     printf("--GRA result(%s):\n", local.func.c_str());
     for (const auto& p : regMap) {
         printf("Assign: %s->%s\n", p.first.c_str(), p.second.c_str());
     }
+#endif
 }
 
 void tempRegisterAllocate(FunctionBlock& local) {
@@ -717,7 +718,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
             tmpReg.erase(tmpReg.begin());
         }
     }
-
+#ifdef DEBUG
     printf("--Temp result(%s):\n", local.func.c_str());
     printf("--TMPLIST:\n");
     for (auto it = tmpList.begin(); it != tmpList.end(); ++it)
@@ -732,7 +733,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
             printf("Cross-block: %s\n", p.first.c_str());
         }
     }
-
+#endif
     auto assignReg = [&](string& name) {
         if (regMap.count(name) && regMap[name] != "") {
             name = regMap[name];
@@ -825,17 +826,21 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
 }
 
 void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
+#ifdef DEBUG
     for (const auto& ir : ircodes) {
         ir.dump();
     }
+#endif
     vector<FunctionBlock> functions;
     divideFunction(ircodes, functions);
     for (auto& funcIR : functions) {
         optimizeFunc(funcIR, optCode);
     }
+#ifdef DEBUG
     printf("--optimize\n");
     for (const auto& code : optCode) {
         code.dump();
     }
+#endif
 }
 #endif

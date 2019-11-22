@@ -673,7 +673,6 @@ void genData() {
 }
 
 void objectCode(const std::vector<IRCode> &ircodes) {
-    sym_table.dump();
     fout = fopen("mips.txt", "w");
     assert(fout);
     genData();
