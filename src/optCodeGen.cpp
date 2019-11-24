@@ -201,14 +201,12 @@ void scanTmp(const std::vector<IRCode> &ircodes) {
         default:
             break;
         }
-    }
-#endif
-#ifdef OPT_LEAF_FUNC
-    if (sym_table.functionParams.count(func) && sym_table.functionParams[func].size()>3){
-        frames[func].isLeaf = false;
-    }
-    if (frames[func].tmpAddr.size() > 0) {
-        frames[func].isLeaf = false;
+        if (sym_table.functionParams.count(func) && sym_table.functionParams[func].size()>3){
+            frames[func].isLeaf = false;
+        }
+        if (frames[func].tmpAddr.size() > 0) {
+            frames[func].isLeaf = false;
+        }
     }
 #endif
 #ifdef OPT_LEAF_FUNC
