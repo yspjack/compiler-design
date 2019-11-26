@@ -788,7 +788,7 @@ IROperator getRelationOp(int t)
     case GRE:
         return IROperator::GT;
     case GEQ:
-        return IROperator::NEQ;
+        return IROperator::GEQ;
     case EQL:
         return IROperator::EQU;
     case NEQ:
