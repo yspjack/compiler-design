@@ -156,7 +156,7 @@ struct FunctionBlock {
     // const vector<IRCode> &operator[](size_t idx) const { return blocks[idx];
     // } vector<IRCode> &operator[](size_t idx) { return blocks[idx]; }
 };
-
+#ifdef OPT_CONST
 void constCombine(const string& func, const vector<IRCode>& ircodes,
     vector<IRCode>& result) {
     int a, b;
@@ -195,31 +195,32 @@ void constCombine(const string& func, const vector<IRCode>& ircodes,
                         to_string(b == 0 ? 0 : (a / b)),
                         "", code.dst));
                     break;
-                case IROperator::LEQ:
-                    result.emplace_back(IRCode(
-                        IROperator::MOV, to_string(a <= b), "", code.dst));
-                    break;
-                case IROperator::LT:
-                    result.emplace_back(IRCode(IROperator::MOV,
-                        to_string(a < b), "", code.dst));
-                    break;
-                case IROperator::GEQ:
-                    result.emplace_back(IRCode(
-                        IROperator::MOV, to_string(a >= b), "", code.dst));
-                    break;
-                case IROperator::GT:
-                    result.emplace_back(IRCode(IROperator::MOV,
-                        to_string(a > b), "", code.dst));
-                    break;
-                case IROperator::NEQ:
-                    result.emplace_back(IRCode(
-                        IROperator::MOV, to_string(a != b), "", code.dst));
-                    break;
-                case IROperator::EQU:
-                    result.emplace_back(IRCode(
-                        IROperator::MOV, to_string(a == b), "", code.dst));
-                    break;
+                //case IROperator::LEQ:
+                //    result.emplace_back(IRCode(
+                //        IROperator::MOV, to_string(a <= b), "", code.dst));
+                //    break;
+                //case IROperator::LT:
+                //    result.emplace_back(IRCode(IROperator::MOV,
+                //        to_string(a < b), "", code.dst));
+                //    break;
+                //case IROperator::GEQ:
+                //    result.emplace_back(IRCode(
+                //        IROperator::MOV, to_string(a >= b), "", code.dst));
+                //    break;
+                //case IROperator::GT:
+                //    result.emplace_back(IRCode(IROperator::MOV,
+                //        to_string(a > b), "", code.dst));
+                //    break;
+                //case IROperator::NEQ:
+                //    result.emplace_back(IRCode(
+                //        IROperator::MOV, to_string(a != b), "", code.dst));
+                //    break;
+                //case IROperator::EQU:
+                //    result.emplace_back(IRCode(
+                //        IROperator::MOV, to_string(a == b), "", code.dst));
+                //    break;
                 default:
+                    result.push_back(code);
                     break;
                 }
             }
@@ -237,15 +238,153 @@ void constCombine(const string& func, const vector<IRCode>& ircodes,
     // }
 }
 
-void constSpread(const string& func, const vector<IRCode>& block,
-    vector<IRCode>& result) {
-    vector<IRCode> tmp[2];
-    tmp[0] = block;
-    tmp[1].clear();
-    constCombine(func, tmp[0], tmp[1]);
-    tmp[0].clear();
-    map<string, string> conTable;
+void constSpread(FunctionBlock &local) {
+    auto crossBlockTmp = [&]()->map<string, int> {
+        auto &func = local.func;
+        auto &blocks = local.blocks;
+        auto &ircodes = local.ircodes;
+        vector<set<string>> useDefTmp;
+        auto addTmp = [&](set<string> &s, const string &name) {
+            if (name.length() > 2 && name[0] == '#' && name[1] == 't')
+            {
+                s.insert(name);
+            }
+        };
+
+        if (func == "") {
+            return map<string, int>();
+        }
+
+        for (int i = 0; i < blocks.size(); i++) {
+            useDefTmp.push_back(set<string>());
+            auto &tmpList = useDefTmp[i];
+            for (const auto &ircode : blocks[i]) {
+                switch (ircode.op) {
+                case IROperator::ADD:
+                case IROperator::SUB:
+                case IROperator::MUL:
+                case IROperator::DIV:
+                    addTmp(tmpList, ircode.op1);
+                    addTmp(tmpList, ircode.op2);
+                    addTmp(tmpList, ircode.dst);
+                    break;
+                case IROperator::LEQ:
+                case IROperator::LT:
+                case IROperator::GEQ:
+                case IROperator::GT:
+                case IROperator::NEQ:
+                case IROperator::EQU:
+                    addTmp(tmpList, ircode.op1);
+                    addTmp(tmpList, ircode.op2);
+                    addTmp(tmpList, ircode.dst);
+                    break;
+                case IROperator::READ:
+                case IROperator::WRITE:
+                    addTmp(tmpList, ircode.op1);
+                    break;
+                case IROperator::PUSH:
+                    addTmp(tmpList, ircode.op1);
+                    break;
+                case IROperator::RET:
+                    if (ircode.op1 != "") {
+                        addTmp(tmpList, ircode.op1);
+                    }
+                    break;
+                case IROperator::LOADARR:
+                case IROperator::SAVEARR:
+                    addTmp(tmpList, ircode.op2);
+                    addTmp(tmpList, ircode.dst);
+                    break;
+                case IROperator::BZ:
+                case IROperator::BNZ:
+                    addTmp(tmpList, ircode.op1);
+                    break;
+                case IROperator::MOV:
+                    addTmp(tmpList, ircode.op1);
+                    addTmp(tmpList, ircode.dst);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        set<string> tmpList;
+        for (const auto &ircode : ircodes) {
+            switch (ircode.op) {
+            case IROperator::ADD:
+            case IROperator::SUB:
+            case IROperator::MUL:
+            case IROperator::DIV:
+                tmpList.insert(ircode.op1);
+                tmpList.insert(ircode.op2);
+                tmpList.insert(ircode.dst);
+                break;
+            case IROperator::LEQ:
+            case IROperator::LT:
+            case IROperator::GEQ:
+            case IROperator::GT:
+            case IROperator::NEQ:
+            case IROperator::EQU:
+                tmpList.insert(ircode.op1);
+                tmpList.insert(ircode.op2);
+                tmpList.insert(ircode.dst);
+                break;
+            case IROperator::READ:
+            case IROperator::WRITE:
+                tmpList.insert(ircode.op1);
+                break;
+            case IROperator::PUSH:
+                tmpList.insert(ircode.op1);
+                break;
+            case IROperator::RET:
+                if (ircode.op1 != "") {
+                    tmpList.insert(ircode.op1);
+                }
+                break;
+            case IROperator::LOADARR:
+            case IROperator::SAVEARR:
+                tmpList.insert(ircode.op2);
+                tmpList.insert(ircode.dst);
+                break;
+            case IROperator::BZ:
+            case IROperator::BNZ:
+                tmpList.insert(ircode.op1);
+                break;
+            case IROperator::MOV:
+                tmpList.insert(ircode.op1);
+                tmpList.insert(ircode.dst);
+                break;
+            default:
+                break;
+            }
+        }
+
+        for (auto it = tmpList.begin(); it != tmpList.end();)
+        {
+            if ((*it).substr(0, 2) == "#t") {
+                ++it;
+            }
+            else {
+                it = tmpList.erase(it);
+            }
+        }
+
+        map<string, int> cnt;
+        for (const string &t : tmpList) {
+            for (int i = 0; i < useDefTmp.size(); i++) {
+                if (useDefTmp[i].count(t)) {
+                    cnt[t]++;
+                }
+            }
+        }
+        return cnt;
+    };
+
+    map<string, int> cnt = crossBlockTmp();
+
 }
+#endif
 
 void divideBlock(FunctionBlock& func) {
     const auto& ircodes = func.ircodes;
@@ -599,7 +738,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
             case IROperator::EQU:
                 addTmp(tmpList,ircode.op1);
                 addTmp(tmpList,ircode.op2);
-                addTmp(tmpList,ircode.dst);
+                //addTmp(tmpList,ircode.dst);
                 break;
             case IROperator::READ:
             case IROperator::WRITE:
@@ -620,7 +759,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
                 break;
             case IROperator::BZ:
             case IROperator::BNZ:
-                addTmp(tmpList,ircode.op1);
+                //addTmp(tmpList,ircode.op1);
                 break;
             case IROperator::MOV:
                 addTmp(tmpList, ircode.op1);
@@ -704,18 +843,23 @@ void tempRegisterAllocate(FunctionBlock& local) {
         }
     }
     //  "$t8", "$t9" Reserved
+    set<string> allTmpReg = { "$t0", "$t1", "$t2", "$t3",
+                          "$t4", "$t5", "$t6", "$t7" };
     set<string> tmpReg = { "$t0", "$t1", "$t2", "$t3",
                           "$t4", "$t5", "$t6", "$t7" };
-    for (const auto& p : tmpList) {
-        if (cnt[p] != 1) {
-            continue;
-        }
-        if (tmpReg.empty()) {
-            regMap[p] = "";
-        }
-        else {
-            regMap[p] = *tmpReg.begin();
-            tmpReg.erase(tmpReg.begin());
+    for (const auto &blk : useDefTmp) {
+        tmpReg = allTmpReg;
+        for (const auto &t : blk) {
+            if (cnt[t] != 1) {
+                continue;
+            }
+            if (tmpReg.empty()) {
+                regMap[t] = "";
+            }
+            else {
+                regMap[t] = *tmpReg.begin();
+                tmpReg.erase(tmpReg.begin());
+            }
         }
     }
 #ifdef DEBUG
@@ -788,7 +932,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
             break;
         case IROperator::BZ:
         case IROperator::BNZ:
-            assignReg(ircode.op1);
+            //assignReg(ircode.op1);
             result.push_back(ircode);
             break;
         case IROperator::MOV:
