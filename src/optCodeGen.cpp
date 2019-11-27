@@ -68,6 +68,9 @@ static bool isConst(const string &var) {
 
 void getReg(const string &name, const string &rd) {
     // fprintf(stderr, "%s\n", name.c_str());
+    if (name == rd) {
+        return;
+    }
     assert(name.length() > 0);
     if (name[0] == '$') {
         writeAsm("move " + rd + ", " + name);
@@ -126,6 +129,9 @@ void getReg(const string &name, const string &rd) {
 
 void saveReg(const string &name, const string &rd) {
     // fprintf(stderr, "%s\n", name.c_str());
+    if (name == rd) {
+        return;
+    }
     if (name[0] == '$') {
         writeAsm("move " + name + ", " + rd);
         return;
@@ -476,6 +482,15 @@ void genArithmetic(const IRCode &ircode) {
     };
     stringstream ss;
     string rs = "$t8", rt = "$t9", rd = "$t8";
+    if (ircode.op1.length() > 0 && ircode.op1[0] == '$') {
+        rs = ircode.op1;
+    }
+    if (ircode.op2.length() > 0 && ircode.op2[0] == '$') {
+        rt = ircode.op2;
+    }
+    if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
+        rd = ircode.dst;
+    }
     bool c1 = isConst(ircode.op1), c2 = isConst(ircode.op2);
     switch (ircode.op) {
     case IROperator::MUL:
@@ -577,6 +592,9 @@ void genArithmetic(const IRCode &ircode) {
 
 void genBranch(const IRCode &ircode) {
     string rs = "$t8";
+    if (ircode.op1.length() > 0 && ircode.op1[0] == '$') {
+        rs = ircode.op1;
+    }
     if (ircode.op == IROperator::BZ) {
         if (isConst(ircode.op1)) {
             if (stoi(ircode.op1) == 0) {
@@ -609,6 +627,10 @@ void genMove(const IRCode &ircode) {
     Symbol *base = sym_table.getByName(curFunc, ircode.dst);
     if (isConst(ircode.op1) && ircode.dst[0] == '$') {
         writeAsm("li " + ircode.dst + "," + ircode.op1);
+        return;
+    }
+    if (ircode.op1[0]=='$' && ircode.dst[0] == '$') {
+        writeAsm("move " + ircode.dst + "," + ircode.op1);
         return;
     }
     string rt = "$t8";
@@ -711,6 +733,12 @@ void objectCode(const std::vector<IRCode> &ircodes) {
                 };
                 string rs = "$t8";
                 string rt = "$t9";
+                if (ircode.op1.length() > 0 && ircode.op1[0] == '$') {
+                    rs = ircode.op1;
+                }
+                if (ircode.op2.length() > 0 && ircode.op2[0] == '$') {
+                    rt = ircode.op2;
+                }
                 if ((ircodes[i + 1].op == IROperator::BNZ) && (ircodes[i].dst == ircodes[i+1].op1)) {
                     getReg(ircode.op1, rs);
                     getReg(ircode.op2, rt);
