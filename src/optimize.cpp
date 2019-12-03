@@ -382,9 +382,143 @@ void constSpread(FunctionBlock &local) {
     };
 
     map<string, int> cnt = crossBlockTmp();
+    auto &func = local.func;
+    auto &blocks = local.blocks;
+    auto &ircodes = local.ircodes;
+    vector<IRCode> result;
+    // Find constant
+    map<string, string> tmpConst;
+    auto rewriteConst = [&](IRCode &ircode) {
+        switch (ircode.op) {
+        case IROperator::ADD:
+        case IROperator::SUB:
+        case IROperator::MUL:
+        case IROperator::DIV:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            if (tmpConst.count(ircode.op2)) {
+                ircode.op2 = tmpConst[ircode.op2];
+            }
+            break;
+        case IROperator::LEQ:
+        case IROperator::LT:
+        case IROperator::GEQ:
+        case IROperator::GT:
+        case IROperator::NEQ:
+        case IROperator::EQU:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            if (tmpConst.count(ircode.op2)) {
+                ircode.op2 = tmpConst[ircode.op2];
+            }
+            break;
+        case IROperator::READ:
+        case IROperator::WRITE:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            break;
+        case IROperator::PUSH:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            break;
+        case IROperator::RET:
+            if (ircode.op1 != "") {
+                if (tmpConst.count(ircode.op1)) {
+                    ircode.op1 = tmpConst[ircode.op1];
+                }
+            }
+            break;
+        case IROperator::LOADARR:
+        case IROperator::SAVEARR:
+            if (tmpConst.count(ircode.op2)) {
+                ircode.op2 = tmpConst[ircode.op2];
+            }
+            break;
+        case IROperator::BZ:
+        case IROperator::BNZ:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            break;
+        case IROperator::MOV:
+            if (tmpConst.count(ircode.op1)) {
+                ircode.op1 = tmpConst[ircode.op1];
+            }
+            break;
+        default:
+            break;
+        }
+    };
+    for (auto &blk : blocks) {
+        for (auto &code : blk) {
+            bool c1 = false, c2 = false;
+            int a, b;
+            rewriteConst(code);
+            if (code.dst.length() > 2 && code.dst.substr(0, 2) == "#t") {
+                switch (code.op) {
+                case IROperator::ADD:
+                case IROperator::SUB:
+                case IROperator::MUL:
+                case IROperator::DIV:
+                    c1 = getConst(func, code.op1, a);
+                    c2 = getConst(func, code.op2, b);
+                    if (c1 && c2) {
+                        switch (code.op) {
+                        case IROperator::ADD:
+                            tmpConst[code.dst] = to_string(a + b);
+                            break;
+                        case IROperator::SUB:
+                            tmpConst[code.dst] = to_string(a - b);
+                            break;
+                        case IROperator::MUL:
+                            tmpConst[code.dst] = to_string(a * b);
+                            break;
+                        case IROperator::DIV:
+                            tmpConst[code.dst] = to_string(a / b);
+                            break;
+                        default:
+                            assert(0);
+                            break;
+                        }
+                    }
+                    else {
+                        result.push_back(code);
+                    }
+                    break;
+                case IROperator::MOV:
+                    c1 = getConst(func, code.op1, a);
+                    if (c1) {
+                        tmpConst[code.dst] = to_string(a);
+                    }
+                    else {
+                        result.push_back(code);
+                    }
+                    break;
+                default:
+                    result.push_back(code);
+                    break;
+                }
+            }
+            else {
+                result.push_back(code);
+            }
+        }
+    }
+#ifdef DEBUG
+    printf("--CONST SPREAD\n");
+    for (auto &code : result) {
+        code.dump();
+    }
+#endif // DEBUG
 
+    local.ircodes = result;
 }
 #endif
+
 
 void divideBlock(FunctionBlock& func) {
     const auto& ircodes = func.ircodes;
@@ -960,6 +1094,11 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
             funcIR.ircodes.push_back(code);
         }
     }
+#ifdef OPT_CONST
+    constSpread(funcIR);
+#endif // OPT_CONST
+
+
 #if defined(OPT_REG_ALLOC)
     globalRegisterAllocate(funcIR);
     tempRegisterAllocate(funcIR);
