@@ -156,6 +156,149 @@ struct FunctionBlock {
     // const vector<IRCode> &operator[](size_t idx) const { return blocks[idx];
     // } vector<IRCode> &operator[](size_t idx) { return blocks[idx]; }
 };
+
+map<string, int> crossBlockTmp(FunctionBlock& local) {
+    auto &func = local.func;
+    auto &blocks = local.blocks;
+    auto &ircodes = local.ircodes;
+    vector<set<string>> useDefTmp;
+    auto addTmp = [&](set<string> &s, const string &name) {
+        if (name.length() > 2 && name[0] == '#' && name[1] == 't')
+        {
+            s.insert(name);
+        }
+    };
+
+    if (func == "") {
+        return map<string, int>();
+    }
+
+    for (int i = 0; i < blocks.size(); i++) {
+        useDefTmp.push_back(set<string>());
+        auto &tmpList = useDefTmp[i];
+        for (const auto &ircode : blocks[i]) {
+            switch (ircode.op) {
+            case IROperator::ADD:
+            case IROperator::SUB:
+            case IROperator::MUL:
+            case IROperator::DIV:
+                addTmp(tmpList, ircode.op1);
+                addTmp(tmpList, ircode.op2);
+                addTmp(tmpList, ircode.dst);
+                break;
+            case IROperator::LEQ:
+            case IROperator::LT:
+            case IROperator::GEQ:
+            case IROperator::GT:
+            case IROperator::NEQ:
+            case IROperator::EQU:
+                addTmp(tmpList, ircode.op1);
+                addTmp(tmpList, ircode.op2);
+                addTmp(tmpList, ircode.dst);
+                break;
+            case IROperator::READ:
+            case IROperator::WRITE:
+                addTmp(tmpList, ircode.op1);
+                break;
+            case IROperator::PUSH:
+                addTmp(tmpList, ircode.op1);
+                break;
+            case IROperator::RET:
+                if (ircode.op1 != "") {
+                    addTmp(tmpList, ircode.op1);
+                }
+                break;
+            case IROperator::LOADARR:
+            case IROperator::SAVEARR:
+                addTmp(tmpList, ircode.op2);
+                addTmp(tmpList, ircode.dst);
+                break;
+            case IROperator::BZ:
+            case IROperator::BNZ:
+                addTmp(tmpList, ircode.op1);
+                break;
+            case IROperator::MOV:
+                addTmp(tmpList, ircode.op1);
+                addTmp(tmpList, ircode.dst);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    set<string> tmpList;
+    for (const auto &ircode : ircodes) {
+        switch (ircode.op) {
+        case IROperator::ADD:
+        case IROperator::SUB:
+        case IROperator::MUL:
+        case IROperator::DIV:
+            tmpList.insert(ircode.op1);
+            tmpList.insert(ircode.op2);
+            tmpList.insert(ircode.dst);
+            break;
+        case IROperator::LEQ:
+        case IROperator::LT:
+        case IROperator::GEQ:
+        case IROperator::GT:
+        case IROperator::NEQ:
+        case IROperator::EQU:
+            tmpList.insert(ircode.op1);
+            tmpList.insert(ircode.op2);
+            tmpList.insert(ircode.dst);
+            break;
+        case IROperator::READ:
+        case IROperator::WRITE:
+            tmpList.insert(ircode.op1);
+            break;
+        case IROperator::PUSH:
+            tmpList.insert(ircode.op1);
+            break;
+        case IROperator::RET:
+            if (ircode.op1 != "") {
+                tmpList.insert(ircode.op1);
+            }
+            break;
+        case IROperator::LOADARR:
+        case IROperator::SAVEARR:
+            tmpList.insert(ircode.op2);
+            tmpList.insert(ircode.dst);
+            break;
+        case IROperator::BZ:
+        case IROperator::BNZ:
+            tmpList.insert(ircode.op1);
+            break;
+        case IROperator::MOV:
+            tmpList.insert(ircode.op1);
+            tmpList.insert(ircode.dst);
+            break;
+        default:
+            break;
+        }
+    }
+
+    for (auto it = tmpList.begin(); it != tmpList.end();)
+    {
+        if ((*it).substr(0, 2) == "#t") {
+            ++it;
+        }
+        else {
+            it = tmpList.erase(it);
+        }
+    }
+
+    map<string, int> cnt;
+    for (const string &t : tmpList) {
+        for (int i = 0; i < useDefTmp.size(); i++) {
+            if (useDefTmp[i].count(t)) {
+                cnt[t]++;
+            }
+        }
+    }
+    return cnt;
+};
+
 #ifdef OPT_CONST
 void constCombine(const string& func, const vector<IRCode>& ircodes,
     vector<IRCode>& result) {
@@ -239,149 +382,8 @@ void constCombine(const string& func, const vector<IRCode>& ircodes,
 }
 
 void constSpread(FunctionBlock &local) {
-    auto crossBlockTmp = [&]()->map<string, int> {
-        auto &func = local.func;
-        auto &blocks = local.blocks;
-        auto &ircodes = local.ircodes;
-        vector<set<string>> useDefTmp;
-        auto addTmp = [&](set<string> &s, const string &name) {
-            if (name.length() > 2 && name[0] == '#' && name[1] == 't')
-            {
-                s.insert(name);
-            }
-        };
 
-        if (func == "") {
-            return map<string, int>();
-        }
-
-        for (int i = 0; i < blocks.size(); i++) {
-            useDefTmp.push_back(set<string>());
-            auto &tmpList = useDefTmp[i];
-            for (const auto &ircode : blocks[i]) {
-                switch (ircode.op) {
-                case IROperator::ADD:
-                case IROperator::SUB:
-                case IROperator::MUL:
-                case IROperator::DIV:
-                    addTmp(tmpList, ircode.op1);
-                    addTmp(tmpList, ircode.op2);
-                    addTmp(tmpList, ircode.dst);
-                    break;
-                case IROperator::LEQ:
-                case IROperator::LT:
-                case IROperator::GEQ:
-                case IROperator::GT:
-                case IROperator::NEQ:
-                case IROperator::EQU:
-                    addTmp(tmpList, ircode.op1);
-                    addTmp(tmpList, ircode.op2);
-                    addTmp(tmpList, ircode.dst);
-                    break;
-                case IROperator::READ:
-                case IROperator::WRITE:
-                    addTmp(tmpList, ircode.op1);
-                    break;
-                case IROperator::PUSH:
-                    addTmp(tmpList, ircode.op1);
-                    break;
-                case IROperator::RET:
-                    if (ircode.op1 != "") {
-                        addTmp(tmpList, ircode.op1);
-                    }
-                    break;
-                case IROperator::LOADARR:
-                case IROperator::SAVEARR:
-                    addTmp(tmpList, ircode.op2);
-                    addTmp(tmpList, ircode.dst);
-                    break;
-                case IROperator::BZ:
-                case IROperator::BNZ:
-                    addTmp(tmpList, ircode.op1);
-                    break;
-                case IROperator::MOV:
-                    addTmp(tmpList, ircode.op1);
-                    addTmp(tmpList, ircode.dst);
-                    break;
-                default:
-                    break;
-                }
-            }
-        }
-
-        set<string> tmpList;
-        for (const auto &ircode : ircodes) {
-            switch (ircode.op) {
-            case IROperator::ADD:
-            case IROperator::SUB:
-            case IROperator::MUL:
-            case IROperator::DIV:
-                tmpList.insert(ircode.op1);
-                tmpList.insert(ircode.op2);
-                tmpList.insert(ircode.dst);
-                break;
-            case IROperator::LEQ:
-            case IROperator::LT:
-            case IROperator::GEQ:
-            case IROperator::GT:
-            case IROperator::NEQ:
-            case IROperator::EQU:
-                tmpList.insert(ircode.op1);
-                tmpList.insert(ircode.op2);
-                tmpList.insert(ircode.dst);
-                break;
-            case IROperator::READ:
-            case IROperator::WRITE:
-                tmpList.insert(ircode.op1);
-                break;
-            case IROperator::PUSH:
-                tmpList.insert(ircode.op1);
-                break;
-            case IROperator::RET:
-                if (ircode.op1 != "") {
-                    tmpList.insert(ircode.op1);
-                }
-                break;
-            case IROperator::LOADARR:
-            case IROperator::SAVEARR:
-                tmpList.insert(ircode.op2);
-                tmpList.insert(ircode.dst);
-                break;
-            case IROperator::BZ:
-            case IROperator::BNZ:
-                tmpList.insert(ircode.op1);
-                break;
-            case IROperator::MOV:
-                tmpList.insert(ircode.op1);
-                tmpList.insert(ircode.dst);
-                break;
-            default:
-                break;
-            }
-        }
-
-        for (auto it = tmpList.begin(); it != tmpList.end();)
-        {
-            if ((*it).substr(0, 2) == "#t") {
-                ++it;
-            }
-            else {
-                it = tmpList.erase(it);
-            }
-        }
-
-        map<string, int> cnt;
-        for (const string &t : tmpList) {
-            for (int i = 0; i < useDefTmp.size(); i++) {
-                if (useDefTmp[i].count(t)) {
-                    cnt[t]++;
-                }
-            }
-        }
-        return cnt;
-    };
-
-    map<string, int> cnt = crossBlockTmp();
+    map<string, int> cnt = crossBlockTmp(local);
     auto &func = local.func;
     auto &blocks = local.blocks;
     auto &ircodes = local.ircodes;
@@ -519,6 +521,91 @@ void constSpread(FunctionBlock &local) {
 }
 #endif
 
+#ifdef OPT_DAG
+
+void optDag(FunctionBlock &local) {
+    map<string, int> cnt = crossBlockTmp(local);
+    vector<IRCode> result;
+    map<string, string> tmpMap;
+    auto findReuse = [](vector<IRCode>& block, IRCode &code)->IRCode* {
+        for (IRCode &ircode : block) {
+            if (ircode.op == code.op) {
+                switch (ircode.op) {
+                case IROperator::ADD:
+                case IROperator::SUB:
+                case IROperator::MUL:
+                case IROperator::DIV:
+                    if (ircode.op1 == code.op1 && ircode.op2 == code.op2) {
+                        return &ircode;
+                    }
+                    break;
+                case IROperator::MOV:
+                    if (ircode.op1 == code.op1 && code.op1 != "#RET") {
+                        return &ircode;
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        return nullptr;
+    };
+    // Scan reusable code
+    for (auto &p : cnt) {
+        tmpMap[p.first] = p.first;
+    }
+    for (auto &block : local.blocks) {
+        for (IRCode &code : ircodes) {
+            IRCode *reusableIR = findReuse(block, code);
+            if (reusableIR != nullptr) {
+                if (cnt[code.dst] == 1 && cnt[reusableIR->dst] == 1) {
+                    tmpMap[code.dst] = reusableIR->dst;
+                }
+            }
+        }
+    }
+    for (auto &block : local.blocks) {
+        vector<IRCode> tmpBlock;
+        for (IRCode &code : block) {
+
+            if (tmpMap.count(code.dst) && tmpMap[code.dst] != code.dst) {
+                bool f = false;
+                switch (code.op) {
+                case IROperator::ADD:
+                case IROperator::SUB:
+                case IROperator::MUL:
+                case IROperator::DIV:
+                case IROperator::MOV:
+                    f = true;
+                    break;
+                default:
+                    break;
+                }
+                if (f)
+                {
+                    printf("DAG:Skip IR %s\n", code.dumpString().c_str());
+                    printf("%s %s\n", code.dst.c_str(), tmpMap[code.dst].c_str());
+
+                    continue;
+                }
+            }
+            IRCode tmpCode = code;
+            if (tmpMap.count(tmpCode.op1)) {
+                tmpCode.op1 = tmpMap[tmpCode.op1];
+            }
+            if (tmpMap.count(tmpCode.op2)) {
+                tmpCode.op2 = tmpMap[tmpCode.op2];
+            }
+            tmpBlock.push_back(tmpCode);
+            result.push_back(tmpCode);
+        }
+        block = tmpBlock;
+    }
+    local.ircodes = result;
+}
+
+#endif
 
 void divideBlock(FunctionBlock& func) {
     const auto& ircodes = func.ircodes;
@@ -1097,6 +1184,10 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
 #ifdef OPT_CONST
     constSpread(funcIR);
 #endif // OPT_CONST
+
+#ifdef OPT_DAG
+    optDag(funcIR);
+#endif
 
 
 #if defined(OPT_REG_ALLOC)
