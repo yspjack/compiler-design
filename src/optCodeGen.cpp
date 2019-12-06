@@ -71,6 +71,9 @@ void getReg(const string &name, const string &rd) {
     if (name == rd) {
         return;
     }
+    if (name == "0" && rd == "$0") {
+        return;
+    }
     assert(name.length() > 0);
     if (name[0] == '$') {
         writeAsm("move " + rd + ", " + name);
@@ -79,7 +82,9 @@ void getReg(const string &name, const string &rd) {
 #ifdef OPT_LEAF_FUNC
     assert(frames.count(curFunc));
     if (frames[curFunc].argReg.count(name)) {
-        writeAsm("move " + rd + ", " + frames[curFunc].argReg[name]);
+        if (rd != frames[curFunc].argReg[name]) {
+            writeAsm("move " + rd + ", " + frames[curFunc].argReg[name]);
+        }
         return;
     }
 #endif
@@ -305,13 +310,16 @@ void genRet(const IRCode &ircode) {
         assert(f != nullptr);
         if (f->type == Symbol::SYM_INT || f->type == Symbol::SYM_CHAR) {
             string rd = "$v0";
-            getReg(ircode.op1, rd);
+            if (isConst(ircode.op1)) {
+                writeAsm("li $v0, " + ircode.op1);
+            }
+            else {
+                getReg(ircode.op1, rd);
+            }
         }
 #ifdef OPT_LEAF_FUNC
         if (frames[curFunc].isLeaf) {
             writeAsm("# LEAF FUNC END");
-            //writeAsm("lw $ra, " + to_string(0) + "($sp)");
-            //writeAsm("addiu $sp, $sp, 4");
             writeAsm("jr $ra");
             return;
         }
@@ -338,6 +346,9 @@ void genPush(const IRCode &ircode) {
     }
 #endif
     string rt = "$t8";
+    if (name.length() > 0 && name[0] == '$') {
+        rt = name;
+    }
     vector<Symbol> params = sym_table.getParams(func);
     Symbol *p = sym_table.getByName(func, params[paramIdx].name);
     assert(p);
@@ -392,6 +403,15 @@ void genLoad(const IRCode &ircode) {
     Symbol *base = sym_table.getByName(curFunc, ircode.op1);
     assert(base != nullptr);
     string rs = "$t8", rt = "$t9";
+    if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
+        rt = ircode.dst;
+    }
+#ifdef OPT_LEAF_FUNC
+    assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(ircode.dst)) {
+        rt = frames[curFunc].argReg[ircode.dst];
+    }
+#endif
     getReg(ircode.op2, rs);
     if (base->global) {
         if (base->type == Symbol::SYM_CHAR) {
@@ -431,6 +451,15 @@ void genStore(const IRCode &ircode) {
     stringstream ss;
     Symbol *base = sym_table.getByName(curFunc, ircode.op1);
     string rs = "$t8", rt = "$t9";
+    if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
+        rt = ircode.dst;
+    }
+#ifdef OPT_LEAF_FUNC
+    assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(ircode.dst)) {
+        rt = frames[curFunc].argReg[ircode.dst];
+    }
+#endif
     getReg(ircode.op2, rs);
     getReg(ircode.dst, rt);
     if (base->global) {
@@ -491,6 +520,15 @@ void genArithmetic(const IRCode &ircode) {
     if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
         rd = ircode.dst;
     }
+#ifdef OPT_LEAF_FUNC
+    assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(ircode.op1)) {
+        rs = frames[curFunc].argReg[ircode.op1];
+    }
+    if (frames[curFunc].argReg.count(ircode.op2)) {
+        rt = frames[curFunc].argReg[ircode.op2];
+    }
+#endif
     bool c1 = isConst(ircode.op1), c2 = isConst(ircode.op2);
     switch (ircode.op) {
     case IROperator::MUL:
@@ -633,9 +671,27 @@ void genMove(const IRCode &ircode) {
         writeAsm("move " + ircode.dst + "," + ircode.op1);
         return;
     }
+    if (ircode.op1 == "#RET" && ircode.dst[0] == '$') {
+        writeAsm("move " + ircode.dst + ", $v0");
+        return;
+    }
+    string from = ircode.op1, to = ircode.dst;
+#ifdef OPT_LEAF_FUNC
+    assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(from)) {
+        from = frames[curFunc].argReg[from];
+    }
+    if (frames[curFunc].argReg.count(to)) {
+        to = frames[curFunc].argReg[to];
+    }
+    if (from[0] == '$' && to[0] == '$') {
+        writeAsm("move " + to + "," + from);
+        return;
+    }
+#endif
     string rt = "$t8";
-    getReg(ircode.op1, rt);
-    saveReg(ircode.dst, rt);
+    getReg(from, rt);
+    saveReg(to, rt);
 }
 
 void genData() {
@@ -738,6 +794,12 @@ void objectCode(const std::vector<IRCode> &ircodes) {
                 }
                 if (ircode.op2.length() > 0 && ircode.op2[0] == '$') {
                     rt = ircode.op2;
+                }
+                if (ircode.op1 == "0") {
+                    rs = "$0";
+                }
+                if (ircode.op2 == "0") {
+                    rt = "$0";
                 }
                 if ((ircodes[i + 1].op == IROperator::BNZ) && (ircodes[i].dst == ircodes[i+1].op1)) {
                     getReg(ircode.op1, rs);
