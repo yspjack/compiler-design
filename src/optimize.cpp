@@ -556,7 +556,7 @@ void optDag(FunctionBlock &local) {
         tmpMap[p.first] = p.first;
     }
     for (auto &block : local.blocks) {
-        for (IRCode &code : ircodes) {
+        for (IRCode &code : block) {
             IRCode *reusableIR = findReuse(block, code);
             if (reusableIR != nullptr) {
                 if (cnt[code.dst] == 1 && cnt[reusableIR->dst] == 1) {
