@@ -12,6 +12,7 @@
 #include <queue>
 #include "IR.h"
 #include "parser.h"
+#include "optimize.h"
 // using std::map;
 // using std::set;
 // using std::string;
@@ -19,20 +20,6 @@
 // using std::to_string;
 // using std::vector;
 using namespace std;
-
-template <typename T> set<T> set_union(const set<T>& a, const set<T>& b) {
-    set<T> c;
-    set_union(a.begin(), a.end(), b.begin(), b.end(),
-        insert_iterator<set<T>>(c, c.begin()));
-    return c;
-}
-
-template <typename T> set<T> set_difference(const set<T>& a, const set<T>& b) {
-    set<T> c;
-    set_difference(a.begin(), a.end(), b.begin(), b.end(),
-        insert_iterator<set<T>>(c, c.begin()));
-    return c;
-}
 
 void algebraOptimize(const vector<IRCode>& ircodes, vector<IRCode>& result) {
     for (const auto& ircode : ircodes) {
@@ -147,15 +134,6 @@ bool getConst(const string& func, const string& var, int& value) {
     value = stoi(var);
     return true;
 }
-
-struct FunctionBlock {
-    string func;
-    vector<IRCode> ircodes;
-    vector<vector<IRCode>> blocks;
-    map<int, vector<int>> blockNext;
-    // const vector<IRCode> &operator[](size_t idx) const { return blocks[idx];
-    // } vector<IRCode> &operator[](size_t idx) { return blocks[idx]; }
-};
 
 map<string, int> crossBlockTmp(FunctionBlock& local) {
     auto& func = local.func;
@@ -511,10 +489,10 @@ void constSpread(FunctionBlock& local) {
         }
     }
 #ifdef DEBUG
-    printf("--CONST SPREAD\n");
-    for (auto& code : result) {
-        code.dump();
-    }
+    //printf("--CONST SPREAD\n");
+    //for (auto &code : result) {
+    //    code.dump();
+    //}
 #endif // DEBUG
 
     local.ircodes = result;
@@ -599,6 +577,61 @@ void optDag(FunctionBlock& local) {
             }
             tmpBlock.push_back(tmpCode);
             result.push_back(tmpCode);
+        }
+        block = tmpBlock;
+    }
+    local.ircodes = result;
+}
+
+#endif
+
+#ifdef OPT_MOVE
+
+void optMove(FunctionBlock& local)
+{
+    const string& func = local.func;
+    auto& ircodes = local.ircodes;
+    auto& blocks = local.blocks;
+    vector<IRCode> result;
+    for (auto& block : blocks) {
+        vector<IRCode> tmpBlock;
+        int i = 0;
+        for (i = 0; i < block.size(); ++i) {
+            bool f = false;
+            switch (block[i].op) {
+            case IROperator::ADD:
+            case IROperator::SUB:
+            case IROperator::MUL:
+            case IROperator::DIV:
+                if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
+                    if (block[i + 1].op1 == block[i].dst) {
+#ifdef DEBUG
+                        printf("STRIP %s\n", block[i + 1].dumpString().c_str());
+#endif
+                        block[i].dst = block[i + 1].dst;
+                        f = true;
+                    }
+                }
+                break;
+            case IROperator::MOV:
+                if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
+                    if (block[i + 1].op1 == block[i].dst) {
+#ifdef DEBUG
+                        printf("STRIP %s\n", block[i + 1].dumpString().c_str());
+#endif
+                        block[i].dst = block[i + 1].dst;
+                        f = true;
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+            tmpBlock.push_back(block[i]);
+            result.push_back(block[i]);
+            if (f) {
+                ++i;
+            }
         }
         block = tmpBlock;
     }
@@ -1181,12 +1214,19 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
             funcIR.ircodes.push_back(code);
         }
     }
+#if 0
+    liveDataflow(funcIR);
+#endif
 #ifdef OPT_CONST
     constSpread(funcIR);
 #endif // OPT_CONST
 
 #ifdef OPT_DAG
     optDag(funcIR);
+#endif
+
+#ifdef OPT_MOVE
+    optMove(funcIR);
 #endif
 
 
@@ -1201,8 +1241,9 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
 
 void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
 #ifdef DEBUG
+    FILE* f = fopen("quad.txt", "w");
     for (const auto& ir : ircodes) {
-        ir.dump();
+        fprintf(f, "%s\n", ir.dumpString().c_str());
     }
 #endif
     vector<FunctionBlock> functions;
@@ -1211,9 +1252,10 @@ void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
         optimizeFunc(funcIR, optCode);
     }
 #ifdef DEBUG
-    printf("--optimize\n");
+    //printf("--optimize\n");
+    f = fopen("opt_quad.txt", "w");
     for (const auto& code : optCode) {
-        code.dump();
+        fprintf(f, "%s\n", code.dumpString().c_str());
     }
 #endif
 }
