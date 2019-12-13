@@ -403,7 +403,7 @@ void with_return_value_function_definition() {
     if (!context.foundReturn) {
         handleError(MISSING_RETURN_STATEMENT_OR_MISMATCH, linenumber);
     }
-    ircodes.push_back(IRCode(IROperator::RET,"0","",""));
+    //ircodes.push_back(IRCode(IROperator::RET,"0","",""));
     check(RBRACE);
     //puts("<有返回值函数定义>");
 }

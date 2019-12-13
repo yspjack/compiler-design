@@ -10,5 +10,7 @@
 #define OPT_CONST
 //#define OPT_DAG
 #define OPT_MOVE
+#define OPT_INLINE
+#define OPT_MOD
 
 #endif // CONFIG_H

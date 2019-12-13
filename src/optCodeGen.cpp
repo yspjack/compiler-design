@@ -50,6 +50,7 @@ struct Frame {
     }
 };
 map<string, Frame> frames;
+static int endCnt = 0;
 
 static bool isConst(const string &var) {
     int i = 0;
@@ -199,20 +200,52 @@ void scanTmp(const std::vector<IRCode> &ircodes) {
     }
 #ifdef OPT_LEAF_FUNC
     func = "";
-    for (const auto& ircode : ircodes) {
+    int retCount = 0;
+    int retPos = -1;
+    for (int i = 0; i < ircodes.size(); i++) {
+        const auto& ircode = ircodes[i];
         switch (ircode.op) {
         case IROperator::FUNC:
             func = ircode.op1;
+            retCount = 0;
+            retPos = i;
+            while (retPos < ircodes.size()) {
+                if (ircodes[retPos].op == IROperator::FUNC && ircodes[retPos].op1 != ircodes[i].op1) {
+                    break;
+                }
+                ++retPos;
+            }
+            --retPos;
             break;
         case IROperator::CALL:
         case IROperator::PUSH:
         case IROperator::VAR:
             frames[func].isLeaf = false;
             break;
+#ifdef OPT_INLINE
+        case IROperator::JUMP:
+        case IROperator::BNZ:
+        case IROperator::BZ:
+            frames[func].isLeaf = false;
+            break;
+        case IROperator::RET:
+            ++retCount;
+            if (retPos != i) {
+#ifdef DEBUG
+                printf("----no inline: Not return at the end\n");
+#endif
+                frames[func].isLeaf = false;
+            }
+#endif
         default:
             break;
         }
-        if (sym_table.functionParams.count(func) && sym_table.functionParams[func].size()>3){
+#ifdef OPT_INLINE
+        if (retCount > 1) {
+            frames[func].isLeaf = false;
+        }
+#endif
+        if (sym_table.functionParams.count(func) && sym_table.functionParams[func].size() > 3) {
             frames[func].isLeaf = false;
         }
         if (frames[func].tmpAddr.size() > 0) {
@@ -245,6 +278,7 @@ void genFunc(const IRCode &ircode) {
 #ifdef OPT_LEAF_FUNC
     assert(frames.count(name));
     if (frames[name].isLeaf) {
+        writeAsm("");
         writeAsm("# LEAF FUNC");
         writeAsm(name + ":");
         //writeAsm("addiu $sp, $sp, -4");
@@ -320,7 +354,11 @@ void genRet(const IRCode &ircode) {
 #ifdef OPT_LEAF_FUNC
         if (frames[curFunc].isLeaf) {
             writeAsm("# LEAF FUNC END");
+#ifdef OPT_INLINE
+            //writeAsm("j .end_" + curFunc + to_string(endCnt));
+#else
             writeAsm("jr $ra");
+#endif
             return;
         }
 #endif
@@ -403,11 +441,17 @@ void genLoad(const IRCode &ircode) {
     Symbol *base = sym_table.getByName(curFunc, ircode.op1);
     assert(base != nullptr);
     string rs = "$t8", rt = "$t9";
+    if (ircode.op2.length() > 0 && ircode.op2[0] == '$') {
+        rs = ircode.op2;
+    }
     if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
         rt = ircode.dst;
     }
 #ifdef OPT_LEAF_FUNC
     assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(ircode.op2)) {
+        rs = frames[curFunc].argReg[ircode.op2];
+    }
     if (frames[curFunc].argReg.count(ircode.dst)) {
         rt = frames[curFunc].argReg[ircode.dst];
     }
@@ -418,29 +462,29 @@ void genLoad(const IRCode &ircode) {
             ss << "lbu " << rt << ", " << base->name << "(" << rs << ")";
             writeAsm(ss.str());
         } else {
-            ss << "sll " << rs << ", " << rs << ", " << 2;
+            ss << "sll " << "$t8" << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "lw " << rt << ", " << base->name << "(" << rs << ")";
+            ss << "lw " << rt << ", " << base->name << "(" << "$t8" << ")";
             writeAsm(ss.str());
         }
     } else {
         if (base->type == Symbol::SYM_CHAR) {
-            ss << "addu " << rs << ", " << rs << ", "
+            ss << "addu " << "$t8" << ", " << rs << ", "
                 << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "lbu " << rt << ", " << base->addr << "(" << rs << ")";
+            ss << "lbu " << rt << ", " << base->addr << "(" << "$t8" << ")";
             writeAsm(ss.str());
         }
         else {
-            ss << "sll " << rs << ", " << rs << ", " << 2;
+            ss << "sll " << "$t8" << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "addu " << rs << ", " << rs << ", " << "$sp";
+            ss << "addu " << "$t8" << ", " << "$t8" << ", " << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "lw " << rt << ", " << base->addr << "(" << rs << ")";
+            ss << "lw " << rt << ", " << base->addr << "(" << "$t8" << ")";
             writeAsm(ss.str());
         }
     }
@@ -451,11 +495,17 @@ void genStore(const IRCode &ircode) {
     stringstream ss;
     Symbol *base = sym_table.getByName(curFunc, ircode.op1);
     string rs = "$t8", rt = "$t9";
+    if (ircode.op2.length() > 0 && ircode.op2[0] == '$') {
+        rs = ircode.op2;
+    }
     if (ircode.dst.length() > 0 && ircode.dst[0] == '$') {
         rt = ircode.dst;
     }
 #ifdef OPT_LEAF_FUNC
     assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(ircode.op2)) {
+        rs = frames[curFunc].argReg[ircode.op2];
+    }
     if (frames[curFunc].argReg.count(ircode.dst)) {
         rt = frames[curFunc].argReg[ircode.dst];
     }
@@ -467,10 +517,10 @@ void genStore(const IRCode &ircode) {
             ss << "sb " << rt << ", " << base->name << "(" << rs << ")";
             writeAsm(ss.str());
         } else {
-            ss << "sll " << rs << ", " << rs << ", " << 2;
+            ss << "sll " << "$t8" << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "sw " << rt << ", " << base->name << "(" << rs << ")";
+            ss << "sw " << rt << ", " << base->name << "(" << "$t8" << ")";
             writeAsm(ss.str());
         }
     } else {
@@ -482,13 +532,13 @@ void genStore(const IRCode &ircode) {
             ss << "sb " << rt << ", " << base->addr << "(" << rs << ")";
             writeAsm(ss.str());
         } else {
-            ss << "sll " << rs << ", " << rs << ", " << 2;
+            ss << "sll " << "$t8" << ", " << rs << ", " << 2;
             writeAsm(ss.str());
             ss.str("");
-            ss << "addu " << rs << ", " << rs << ", " << "$sp";
+            ss << "addu " << "$t8" << ", " << "$t8" << ", " << "$sp";
             writeAsm(ss.str());
             ss.str("");
-            ss << "sw " << rt << ", " << base->addr << "(" << rs << ")";
+            ss << "sw " << rt << ", " << base->addr << "(" << "$t8" << ")";
             writeAsm(ss.str());
         }
     }
@@ -501,6 +551,46 @@ static vector<string> powerOf2 = {
     "262144",    "524288",   "1048576",  "2097152",   "4194304",   "8388608",
     "16777216",  "33554432", "67108864", "134217728", "268435456", "536870912",
     "1073741824"};
+
+#ifdef OPT_MOD
+void genMod(const string &op1, const string &op2, const string &dst) {
+    stringstream ss;
+    string rs = "$t8", rt = "$t9", rd = "$t8";
+    if (op1.length() > 0 && op1[0] == '$') {
+        rs = op1;
+    }
+    if (op2.length() > 0 && op2[0] == '$') {
+        rt = op2;
+    }
+    if (dst.length() > 0 && dst[0] == '$') {
+        rd = dst;
+    }
+#ifdef OPT_LEAF_FUNC
+    assert(frames.count(curFunc));
+    if (frames[curFunc].argReg.count(op1)) {
+        rs = frames[curFunc].argReg[op1];
+    }
+    if (frames[curFunc].argReg.count(op2)) {
+        rt = frames[curFunc].argReg[op2];
+    }
+#endif
+    bool c1 = isConst(op1), c2 = isConst(op2);
+    if (c1 && c2) {
+        ss << "li " << rd << ", " << stoi(op1) % stoi(op2);
+        writeAsm(ss.str());
+    }
+    else {
+        getReg(op1, rs);
+        getReg(op2, rt);
+        ss << "div " << rs << ", " << rt;
+        writeAsm(ss.str());
+        ss.str("");
+        ss << "mfhi " << rd;
+        writeAsm(ss.str());
+    }
+    saveReg(dst, rd);
+}
+#endif
 
 void genArithmetic(const IRCode &ircode) {
     static map<IROperator, string> instruct = {
@@ -750,16 +840,8 @@ void genData() {
     // writeAsm(".end: .word 0");
 }
 
-void objectCode(const std::vector<IRCode> &ircodes) {
-    fout = fopen("mips.txt", "w");
-    assert(fout);
-    genData();
-    scanTmp(ircodes);
-    writeAsm(".text");
-    writeAsm(".globl main");
-    writeAsm("j main");
-
-    for (int i = 0; i < ircodes.size();i++) {
+void genText(const std::vector<IRCode>& ircodes) {
+    for (int i = 0; i < ircodes.size(); i++) {
         const auto& ircode = ircodes[i];
         writeAsm("#" + ircode.dumpString());
         switch (ircode.op) {
@@ -767,6 +849,23 @@ void objectCode(const std::vector<IRCode> &ircodes) {
         case IROperator::SUB:
         case IROperator::MUL:
         case IROperator::DIV:
+#ifdef OPT_MOD
+            if (i + 2 < ircodes.size()) {
+                if (ircodes[i].op == IROperator::DIV
+                    && ircodes[i + 1].op == IROperator::MUL
+                    && ircodes[i + 2].op == IROperator::SUB) {
+                    if (ircodes[i + 1].op1 == ircodes[i].dst
+                        && ircodes[i + 1].op2 == ircodes[i].op2
+                        && ircodes[i + 2].op1 == ircodes[i].op1
+                        && ircodes[i + 2].op2 == ircodes[i + 1].dst)
+                    {
+                        genMod(ircodes[i].op1, ircodes[i].op2, ircodes[i + 2].dst);
+                        i += 2;
+                        continue;
+                    }
+                }
+            }
+#endif
             genArithmetic(ircode);
             break;
         case IROperator::LEQ:
@@ -801,13 +900,13 @@ void objectCode(const std::vector<IRCode> &ircodes) {
                 if (ircode.op2 == "0") {
                     rt = "$0";
                 }
-                if ((ircodes[i + 1].op == IROperator::BNZ) && (ircodes[i].dst == ircodes[i+1].op1)) {
+                if ((ircodes[i + 1].op == IROperator::BNZ) && (ircodes[i].dst == ircodes[i + 1].op1)) {
                     getReg(ircode.op1, rs);
                     getReg(ircode.op2, rt);
                     writeAsm(instruct[ircode.op] + " " + rs + ", " + rt + ", " + ircodes[i + 1].op2);
                     ++i;
                 }
-                else if ((ircodes[i + 1].op == IROperator::BZ) && (ircodes[i].dst == ircodes[i+1].op1)) {
+                else if ((ircodes[i + 1].op == IROperator::BZ) && (ircodes[i].dst == ircodes[i + 1].op1)) {
                     getReg(ircode.op1, rs);
                     getReg(ircode.op2, rt);
                     writeAsm(instructRev[ircode.op] + " " + rs + ", " + rt + ", " + ircodes[i + 1].op2);
@@ -831,7 +930,40 @@ void objectCode(const std::vector<IRCode> &ircodes) {
             genWrite(ircode);
             break;
         case IROperator::CALL:
+#ifdef OPT_INLINE
+            if (frames[ircode.op1].isLeaf) {
+                writeAsm("########BEGIN INLINE " + ircode.op1);
+                vector<IRCode> tmpCode;
+                int j;
+                string oldFunc = curFunc;
+                curFunc = ircode.op1;
+                for (j = 0; j < ircodes.size(); ++j) {
+                    if (ircodes[j].op == IROperator::FUNC
+                        && ircodes[j].op1 == ircode.op1) {
+                        break;
+                    }
+                }
+                ++j;
+                while (j < ircodes.size()) {
+                    if (ircodes[j].op == IROperator::FUNC
+                        && ircodes[j].op1 != ircode.op1) {
+                        break;
+                    }
+                    tmpCode.push_back(ircodes[j]);
+                    ++j;
+                }
+                genText(tmpCode);
+                curFunc = oldFunc;
+                writeAsm(".end_" + ircode.op1 + to_string(endCnt) + ":");
+                ++endCnt;
+                writeAsm("########END INLINE " + ircode.op1);
+            }
+            else {
+                writeAsm("jal " + ircode.op1);
+            }
+#else
             writeAsm("jal " + ircode.op1);
+#endif
             break;
         case IROperator::JUMP:
             writeAsm("j " + ircode.op1);
@@ -849,7 +981,23 @@ void objectCode(const std::vector<IRCode> &ircodes) {
             genStore(ircode);
             break;
         case IROperator::FUNC:
+#ifdef OPT_INLINE
+            if (frames.count(ircodes[i].op1) && frames[ircodes[i].op1].isLeaf) {
+                string f = ircodes[i].op1;
+                while (i < ircodes.size()) {
+                    if (ircodes[i].op == IROperator::FUNC && ircodes[i].op1 != f) {
+                        break;
+                    }
+                    ++i;
+                }
+                --i;
+            }
+            else {
+                genFunc(ircode);
+            }
+#else
             genFunc(ircode);
+#endif
             break;
         case IROperator::LABEL:
             genLabel(ircode);
@@ -865,6 +1013,18 @@ void objectCode(const std::vector<IRCode> &ircodes) {
             break;
         }
     }
+}
+
+void objectCode(const std::vector<IRCode> &ircodes) {
+    fout = fopen("mips.txt", "w");
+    assert(fout);
+    genData();
+    scanTmp(ircodes);
+    writeAsm(".text");
+    writeAsm(".globl main");
+    writeAsm("j main");
+    genText(ircodes);
+
     fclose(fout);
     //sym_table.dump();
 }
