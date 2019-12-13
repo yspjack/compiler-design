@@ -189,6 +189,9 @@ void scanTmp(const std::vector<IRCode> &ircodes) {
             func = ircodes[i].op1;
             frames[func] = Frame(func);
         } else {
+            if (func == "") {
+                continue;
+            }
             assert(frames.count(func));
             if (ircodes[i].dst[0] == '#' && ircodes[i].dst[1] == 't') {
                 frames[func].allocTemp(ircodes[i].dst);
@@ -1024,7 +1027,6 @@ void objectCode(const std::vector<IRCode> &ircodes) {
     writeAsm(".globl main");
     writeAsm("j main");
     genText(ircodes);
-
     fclose(fout);
     //sym_table.dump();
 }

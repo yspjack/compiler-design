@@ -562,9 +562,10 @@ void optDag(FunctionBlock& local) {
                 }
                 if (f)
                 {
+#ifdef DEBUG
                     printf("DAG:Skip IR %s\n", code.dumpString().c_str());
                     printf("%s %s\n", code.dst.c_str(), tmpMap[code.dst].c_str());
-
+#endif
                     continue;
                 }
             }
@@ -645,8 +646,8 @@ void divideBlock(FunctionBlock& func) {
     vector<vector<IRCode>>& blocks = func.blocks;
     map<int, vector<int>>& nxt = func.blockNext;
     set<int> entry;
-    // entry.insert(0);
-    // entry.insert(ircodes.size());
+    entry.insert(0);
+    entry.insert(ircodes.size());
     blocks.push_back(vector<IRCode>());
     for (int i = 0; i < ircodes.size(); i++) {
         switch (ircodes[i].op) {
@@ -769,7 +770,7 @@ void divideFunction(const vector<IRCode>& ircodes,
     }
     assert(result.size() > 0);
 }
-
+#ifdef OPT_REG_ALLOC
 void globalRegisterAllocate(FunctionBlock& local) {
     auto& ircodes = local.ircodes;
     const string& func = local.func;
@@ -948,8 +949,8 @@ void globalRegisterAllocate(FunctionBlock& local) {
     local.ircodes = result;
 #ifdef DEBUG
     printf("--GRA result(%s):\n", local.func.c_str());
-    for (const auto& p : regMap) {
-        printf("Assign: %s->%s\n", p.first.c_str(), p.second.c_str());
+    for (const auto& s : tmp) {
+        printf("Assign: %s->%s\n", s.c_str(), regMap[s].c_str());
     }
 #endif
 }
@@ -957,12 +958,16 @@ void globalRegisterAllocate(FunctionBlock& local) {
 void tempRegisterAllocate(FunctionBlock& local) {
     auto& ircodes = local.ircodes;
     auto& blocks = local.blocks;
-    auto& blockNext = local.blockNext;
+    //auto& blockNext = local.blockNext;
+    auto& liveVarCount = local.liveVarCount;
     const string& func = local.func;
     vector<set<string>> useDefTmp;
     auto addTmp = [&](set<string>& s, const string& name) {
         if (name.length() > 2 && name[0] == '#' && name[1] == 't')
         {
+            s.insert(name);
+        }
+        if (liveVarCount.count(name) && liveVarCount[name] == 0) {
             s.insert(name);
         }
     };
@@ -1104,7 +1109,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
     for (const auto& blk : useDefTmp) {
         tmpReg = allTmpReg;
         for (const auto& t : blk) {
-            if (cnt[t] != 1) {
+            if (cnt[t] > 1) {
                 continue;
             }
             if (tmpReg.empty()) {
@@ -1127,7 +1132,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
         printf("Assign: %s->%s\n", p.first.c_str(), p.second.c_str());
     }
     for (const auto& p : cnt) {
-        if (p.second != 1) {
+        if (p.second > 1) {
             printf("Cross-block: %s\n", p.first.c_str());
         }
     }
@@ -1200,6 +1205,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
         }
     }
 }
+#endif
 
 void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
     vector<IRCode> ircodes;
@@ -1214,9 +1220,6 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
             funcIR.ircodes.push_back(code);
         }
     }
-#if 0
-    liveDataflow(funcIR);
-#endif
 #ifdef OPT_CONST
     constSpread(funcIR);
 #endif // OPT_CONST
@@ -1229,6 +1232,9 @@ void optimizeFunc(FunctionBlock& funcIR, vector<IRCode>& optCode) {
     optMove(funcIR);
 #endif
 
+#ifdef OPT_LIVE_DATAFLOW
+    liveDataflow(funcIR);
+#endif
 
 #if defined(OPT_REG_ALLOC)
     globalRegisterAllocate(funcIR);
@@ -1245,6 +1251,7 @@ void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
     for (const auto& ir : ircodes) {
         fprintf(f, "%s\n", ir.dumpString().c_str());
     }
+    fclose(f);
 #endif
     vector<FunctionBlock> functions;
     divideFunction(ircodes, functions);
@@ -1257,6 +1264,7 @@ void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
     for (const auto& code : optCode) {
         fprintf(f, "%s\n", code.dumpString().c_str());
     }
+    fclose(f);
 #endif
 }
 #endif
