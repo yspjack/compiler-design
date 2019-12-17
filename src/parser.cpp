@@ -9,6 +9,7 @@
 #include <map>
 #include <vector>
 
+#include "config.h"
 #include "lexer.h"
 #include "parser.h"
 #include "symtab.h"
@@ -823,6 +824,33 @@ void loop_statement() {
     int type;
     string tmp;
     if (tokenType == WHILETK) {
+#ifdef OPT_JUMP
+        vector<IRCode> conditionCode;
+        string labA, labB;
+        labA = genLabel();
+        labB = genLabel();
+        check(WHILETK);
+        
+        check(LPARENT);
+        int old = ircodes.size();
+        condition(tmp);
+        for (int i = old; i < ircodes.size(); i++)
+        {
+            conditionCode.push_back(ircodes[i]);
+        }
+        ircodes.push_back(IRCode(IROperator::BZ, tmp, labB, ""));
+        ircodes.push_back(IRCode(IROperator::LABEL, labA, "", ""));
+        check(RPARENT);
+        
+        statement();
+
+        for (int i = 0; i < conditionCode.size(); i++)
+        {
+            ircodes.push_back(conditionCode[i]);
+        }
+        ircodes.push_back(IRCode(IROperator::BNZ, tmp, labA, ""));
+        ircodes.push_back(IRCode(IROperator::LABEL, labB, "", ""));
+#else
         string labA, labB;
         labA = genLabel();
         labB = genLabel();
@@ -831,12 +859,71 @@ void loop_statement() {
         check(LPARENT);
         condition(tmp);
         check(RPARENT);
+
         ircodes.push_back(IRCode(IROperator::BZ, tmp, labB, ""));
         statement();
         ircodes.push_back(IRCode(IROperator::JUMP, labA, "", ""));
         ircodes.push_back(IRCode(IROperator::LABEL, labB, "", ""));
+#endif
     }
     else if (tokenType == FORTK) {
+        
+#ifdef OPT_JUMP
+        vector<IRCode> conditionCode;
+        string labCompare = genLabel();
+        string labEnd = genLabel();
+        string loopVar, loopVar2;
+        int step;
+        check(FORTK);
+        check(LPARENT);
+        loopVar = tokenVal;
+        checkAssign(tokenVal);
+        check(IDENFR);
+        check(ASSIGN);
+        expression(type, tmp);
+        ircodes.push_back(IRCode(IROperator::MOV, tmp, "", loopVar));
+        check(SEMICN);
+        
+        int old = ircodes.size();
+        condition(tmp);
+        for (int i = old; i < ircodes.size(); i++)
+        {
+            conditionCode.push_back(ircodes[i]);
+        }
+        ircodes.push_back(IRCode(IROperator::BZ, tmp, labEnd, ""));
+
+        ircodes.push_back(IRCode(IROperator::LABEL, labCompare, "", ""));
+        check(SEMICN);
+        loopVar = tokenVal;
+        checkAssign(tokenVal);
+        check(IDENFR);
+        check(ASSIGN);
+        loopVar2 = tokenVal;
+        check(IDENFR);
+        IROperator op;
+        if (tokenType == PLUS || tokenType == MINU) {
+            op = (tokenType == PLUS) ? IROperator::ADD : IROperator::SUB;
+            skip();
+            step = step_size();
+        }
+        else {
+            // ERROR
+        }
+
+        check(RPARENT);
+        
+        statement();
+
+        string tmpStep = std::to_string(step);
+        ircodes.push_back(IRCode(op, loopVar2, tmpStep, loopVar));
+
+        for (int i = 0; i < conditionCode.size(); i++)
+        {
+            ircodes.push_back(conditionCode[i]);
+        }
+        ircodes.push_back(IRCode(IROperator::BNZ, tmp, labCompare, ""));
+        ircodes.push_back(IRCode(IROperator::LABEL, labEnd, "", ""));
+#else
         // string labStep = genLabel();
         string labCompare = genLabel();
         // string labLoop = genLabel();
@@ -865,11 +952,12 @@ void loop_statement() {
         check(IDENFR);
         IROperator op;
         if (tokenType == PLUS || tokenType == MINU) {
-          op = (tokenType == PLUS) ? IROperator::ADD : IROperator::SUB;
-          skip();
-          step = step_size();
-        } else {
-          // ERROR
+            op = (tokenType == PLUS) ? IROperator::ADD : IROperator::SUB;
+            skip();
+            step = step_size();
+        }
+        else {
+            // ERROR
         }
 
         check(RPARENT);
@@ -879,11 +967,12 @@ void loop_statement() {
         // tmp = genTmp();
         // ircodes.push_back(
         //     IRCode(IROperator::LI, std::to_string(step), "", tmp));
-        tmp=std::to_string(step);
+        tmp = std::to_string(step);
         ircodes.push_back(IRCode(op, loopVar2, tmp, loopVar));
 
         ircodes.push_back(IRCode(IROperator::JUMP, labCompare, "", ""));
         ircodes.push_back(IRCode(IROperator::LABEL, labEnd, "", ""));
+#endif
     }
     else if (tokenType == DOTK) {
         string labA;
