@@ -659,11 +659,15 @@ void optDag(FunctionBlock& local) {
                     printf("DAG:Skip IR %s\n", code.dumpString().c_str());
                     printf("%s %s\n", code.dst.c_str(), reusableIR->dst.c_str());
 #endif
+                    IRCode tmpCode(IROperator::MOV, reusableIR->dst, "", code.dst);
+                    tmpBlock.push_back(tmpCode);
+                    result.push_back(tmpCode);
                     continue;
                 }
-                IRCode tmpCode(IROperator::MOV, reusableIR->dst, "", code.dst);
-                tmpBlock.push_back(tmpCode);
-                result.push_back(tmpCode);
+                else {
+                    tmpBlock.push_back(code);
+                    result.push_back(code);
+                }
             }
             else {
                 tmpBlock.push_back(code);
@@ -1929,12 +1933,7 @@ void tempRegisterAllocate(FunctionBlock& local) {
 #endif
 
 void optimizeFunc(FunctionBlock& funcIR) {
-    vector<IRCode> ircodes;
     divideBlock(funcIR);
-    // for (const auto &block : funcIR.blocks) {
-    //     vector<IRCode> tmp;
-    //     constCombine(funcIR.func, block, tmp);
-    // }
     funcIR.ircodes.clear();
     for (const auto& block : funcIR.blocks) {
         for (const auto& code : block) {
