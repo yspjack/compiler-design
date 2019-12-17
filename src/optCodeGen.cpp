@@ -53,6 +53,9 @@ map<string, Frame> frames;
 static int endCnt = 0;
 
 static bool isConst(const string &var) {
+    if (var.length() == 0) {
+        return false;
+    }
     int i = 0;
     if (var[0] == '-' || var[0] == '+') {
         i = 1;
@@ -138,8 +141,12 @@ void saveReg(const string &name, const string &rd) {
     if (name == rd) {
         return;
     }
-    if (name[0] == '$') {
+    if (name[0] == '$' && rd[0] == '$') {
         writeAsm("move " + name + ", " + rd);
+        return;
+    }
+    if (name == "#RET") {
+        writeAsm("move $v0, " + rd);
         return;
     }
 #ifdef OPT_LEAF_FUNC
@@ -210,6 +217,9 @@ void scanTmp(const std::vector<IRCode> &ircodes) {
         switch (ircode.op) {
         case IROperator::FUNC:
             func = ircode.op1;
+            if (func == "main") {
+                frames[func].isLeaf = false;
+            }
             retCount = 0;
             retPos = i;
             while (retPos < ircodes.size()) {
@@ -766,6 +776,10 @@ void genMove(const IRCode &ircode) {
     }
     if (ircode.op1 == "#RET" && ircode.dst[0] == '$') {
         writeAsm("move " + ircode.dst + ", $v0");
+        return;
+    }
+    if (ircode.dst == "#RET" && ircode.op1[0] == '$') {
+        writeAsm("move $v0, " + ircode.op1);
         return;
     }
     string from = ircode.op1, to = ircode.dst;
