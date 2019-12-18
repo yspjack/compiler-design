@@ -21,8 +21,9 @@ const char* errString[] = {
 
 void handleError(int errCode,int line)
 {
+    FOUND_ERR = 1;
     if (errCode < 15)
-        printf("%d %s\n", line, errString[errCode]);
+        fprintf(err_fout, "%d %s\n", line, errString[errCode]);
     else
-        printf("%d %d\n", line, errCode);
+        fprintf(err_fout, "%d %d\n", line, errCode);
 }

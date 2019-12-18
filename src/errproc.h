@@ -33,4 +33,6 @@ enum ERROR_TYPE {
     MISSING_WHILE,
     CONSTANT_DEFINITION_ERROR
 };
+extern int FOUND_ERR;
+extern FILE* err_fout;
 void handleError(int errCode, int line);

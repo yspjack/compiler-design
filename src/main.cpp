@@ -7,16 +7,20 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "config.h"
 #include "lexer.h"
 #include "parser.h"
 #include "optimize.h"
-#include "config.h"
+#include "errproc.h"
 // #define DEBUG
+
+int FOUND_ERR = 0;
+FILE* err_fout = NULL;
 
 int main() {
     FILE *fin;
     fin = fopen("testfile.txt", "rb");
-    //freopen("error.txt", "w", stdout);
+    err_fout = fopen("error.txt", "w");
 #ifndef DEBUG
 #endif
     assert(fin);
@@ -35,6 +39,11 @@ int main() {
     nextToken();
 
     program();
+    fclose(err_fout);
+    if (FOUND_ERR) {
+        free(buf);
+        return 0;
+    }
     // sym_table.dump();
     // for (auto &i : ircodes) {
     //     i.dump();
