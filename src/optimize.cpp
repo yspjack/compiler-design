@@ -689,44 +689,79 @@ void optMove(FunctionBlock& local)
     auto& ircodes = local.ircodes;
     auto& blocks = local.blocks;
     vector<IRCode> result;
+    map<string, int> cnt = crossBlockTmp(local);
     for (auto& block : blocks) {
         vector<IRCode> tmpBlock;
         int i = 0;
         for (i = 0; i < block.size(); ++i) {
-            bool f = false;
-            switch (block[i].op) {
-            case IROperator::ADD:
-            case IROperator::SUB:
-            case IROperator::MUL:
-            case IROperator::DIV:
-                if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
-                    if (block[i + 1].op1 == block[i].dst) {
-#ifdef DEBUG
-                        printf("STRIP %s\n", block[i + 1].dumpString().c_str());
-#endif
-                        block[i].dst = block[i + 1].dst;
-                        f = true;
+            bool no_opt = false;
+            if (block[i].dst.length() > 0 && block[i].dst[0] == '#')
+            {
+                int refCnt = 0;
+                const string& name = block[i].dst;
+                for (int j = i + 2; j < block.size(); j++) {
+                    if (block[j].dst == name 
+                        || block[j].op1 == name 
+                        || block[j].op2 == name) {
+                        ++refCnt;
                     }
                 }
-                break;
-            case IROperator::MOV:
-                if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
-                    if (block[i + 1].op1 == block[i].dst) {
+                if (cnt.count(name) && cnt[name] > 1) {
 #ifdef DEBUG
-                        printf("STRIP %s\n", block[i + 1].dumpString().c_str());
+                    printf("Cross-block: %s, do not strip\n", name.c_str());
 #endif
-                        block[i].dst = block[i + 1].dst;
-                        f = true;
-                    }
+                    no_opt = true;
                 }
-                break;
-            default:
-                break;
+                if (refCnt) {
+#ifdef DEBUG
+                    printf("In-block: Reference after: %s, do not strip\n", name.c_str());
+#endif
+                    no_opt = true;
+                }
             }
-            tmpBlock.push_back(block[i]);
-            result.push_back(block[i]);
-            if (f) {
-                ++i;
+            else {
+                no_opt = true;
+            }
+            if (!no_opt) {
+                bool f = false;
+                switch (block[i].op) {
+                case IROperator::ADD:
+                case IROperator::SUB:
+                case IROperator::MUL:
+                case IROperator::DIV:
+                    if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
+                        if (block[i + 1].op1 == block[i].dst) {
+#ifdef DEBUG
+                            printf("STRIP %s\n", block[i + 1].dumpString().c_str());
+#endif
+                            block[i].dst = block[i + 1].dst;
+                            f = true;
+                        }
+                    }
+                    break;
+                case IROperator::MOV:
+                    if (i + 1 < block.size() && block[i + 1].op == IROperator::MOV) {
+                        if (block[i + 1].op1 == block[i].dst) {
+#ifdef DEBUG
+                            printf("STRIP %s\n", block[i + 1].dumpString().c_str());
+#endif
+                            block[i].dst = block[i + 1].dst;
+                            f = true;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+                }
+                tmpBlock.push_back(block[i]);
+                result.push_back(block[i]);
+                if (f) {
+                    ++i;
+                }
+            }
+            else {
+                tmpBlock.push_back(block[i]);
+                result.push_back(block[i]);
             }
         }
         block = tmpBlock;
