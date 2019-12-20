@@ -1081,7 +1081,7 @@ void value_parameter_table(const string& func) {
 }
 //<语句列>
 void statement_column() {
-    while (tokenType != RBRACE) {
+    while (tokenType != RBRACE && tokenType != END) {
         statement();
     }
     //puts("<语句列>");
