@@ -1157,12 +1157,18 @@ void optInlineIR(vector<IRCode>& ircodes)
                             result.push_back(targetCode);
                             break;
                         case IROperator::RET:
-                            if (paramMap.count(targetCode.op1)) {
-                                result.push_back(IRCode(IROperator::MOV, paramMap[targetCode.op1], "", "#RET"));
+                        {
+                            Symbol* f = sym_table.getByName("", to);
+                            assert(f != nullptr);
+                            if (f->type == Symbol::SYM_INT || f->type == Symbol::SYM_CHAR) {
+                                if (paramMap.count(targetCode.op1)) {
+                                    result.push_back(IRCode(IROperator::MOV, paramMap[targetCode.op1], "", "#RET"));
+                                }
+                                else {
+                                    result.push_back(IRCode(IROperator::MOV, targetCode.op1, "", "#RET"));
+                                }
                             }
-                            else {
-                                result.push_back(IRCode(IROperator::MOV, targetCode.op1, "", "#RET"));
-                            }
+                        }
                             break;
                         case IROperator::MOV:
                             rewrite(targetCode.op1);
