@@ -2010,7 +2010,7 @@ void optimizeFunc(FunctionBlock& funcIR) {
 }
 
 void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
-#ifdef DEBUG
+#if defined(DEBUG) || defined(DUMP_QUAD)
     FILE* f = fopen("quad.txt", "w");
     for (const auto& ir : ircodes) {
         fprintf(f, "%s\n", ir.dumpString().c_str());
@@ -2045,7 +2045,7 @@ void optimizeIR(const vector<IRCode>& ircodes, vector<IRCode>& optCode) {
         }
     }
 #endif
-#ifdef DEBUG
+#if defined(DEBUG) || defined(DUMP_QUAD)
     //printf("--optimize\n");
     f = fopen("opt_quad.txt", "w");
     for (const auto& code : optCode) {
