@@ -422,6 +422,9 @@ void constSpread(FunctionBlock& local) {
             if (tmpConst.count(ircode.op2)) {
                 ircode.op2 = tmpConst[ircode.op2];
             }
+            if (tmpConst.count(ircode.dst)) {
+                ircode.dst = tmpConst[ircode.dst];
+            }
             break;
         case IROperator::BZ:
         case IROperator::BNZ:
