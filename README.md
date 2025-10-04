@@ -16,6 +16,14 @@ MIPS汇编：`mips.txt`
 
 使用Mars仿真器运行输出文件。
 
+## 设计文档
+
+- [词法分析](docs/lexer.md)
+- [文法分析](docs/syntax.md)
+- [中间表示](docs/intermediate-representation.md)
+- [代码生成](docs/code-generating.md)
+- [代码优化](docs/optimization.md)
+
 ## 文法
 
 ```

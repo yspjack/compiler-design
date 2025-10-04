@@ -56,7 +56,7 @@ int isLetter(char c) {
 }
 
 static int n;
-static char* buf;
+static const char* buf;
 
 int tokenType;
 string tokenVal;
@@ -70,7 +70,7 @@ int lastline;
 // Line number for current token
 int linenumber;
 
-void initLexer(char* str, int len) {
+void initLexer(const char* str, int len) {
     buf = str;
     n = len;
     cur = 0;

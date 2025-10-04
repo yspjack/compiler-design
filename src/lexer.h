@@ -51,7 +51,7 @@ extern int tokenType;
 extern string tokenVal;
 extern int lastline;
 extern int linenumber;
-extern void initLexer(char* str, int len);
+extern void initLexer(const char* str, int len);
 extern void nextToken();
 extern int lookAhead(int n);
 

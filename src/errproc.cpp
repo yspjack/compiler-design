@@ -1,6 +1,10 @@
 #include <cstdio>
 #include "lexer.h"
 #include "errproc.h"
+
+int FOUND_ERR = 0;
+FILE* err_fout = stderr;
+
 const char* errString[] = {
     "a",
     "b",

@@ -14,8 +14,7 @@
 #include "errproc.h"
 // #define DEBUG
 
-int FOUND_ERR = 0;
-FILE* err_fout = NULL;
+
 
 int main() {
     FILE *fin;

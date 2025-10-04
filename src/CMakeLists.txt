@@ -1,3 +1,7 @@
-add_executable(main lexer.cpp parser.cpp main.cpp symtab.cpp errproc.cpp
-                IR.cpp codeGen.cpp optimize.cpp optCodeGen.cpp dataflow.cpp)
-# add_library(main_lib lexer.cpp parser.cpp symtab.cpp errproc.cpp)
+file(GLOB SOURCES SOURCES *.cpp *.h)
+file(GLOB MAIN_SOURCES main.cpp)
+list(REMOVE_ITEM SOURCES ${MAIN_SOURCES})
+message(STATUS "SOURCES: ${SOURCES}")
+add_library(main_lib STATIC ${SOURCES})
+add_executable(main ${MAIN_SOURCES})
+target_link_libraries(main PUBLIC main_lib)
